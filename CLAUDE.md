@@ -42,11 +42,12 @@ solution.
 ## 6. Machines
 
 - **Never run tests, builds or heavy commands on the laptop.** Tests run on
-  the VPS: `nice -n 19` and the `gzetryn_test` database.
+  the VPS with `nice -n 19`; DB tests use the schema `gzetryn_test` inside
+  the `gzetryn` database.
 - The VPS (`root@46.250.236.190`, key `~/.ssh/vps-contabo`) is shared.
   gzetryn owns only `/opt/gzetryn`, `/var/lib/gzetryn`, systemd
   `gzetryn.service`, port `127.0.0.1:8793`, and the Postgres 16 (port 5433)
-  roles/databases `gzetryn` and `gzetryn_test`. Never touch cdexio-*,
+  role + database `gzetryn` (nothing else). Never touch cdexio-*,
   bscout, xscout, zetryn-* services, other databases, or global Postgres
   config. Never use wildcard `systemctl`/`pkill`.
 
