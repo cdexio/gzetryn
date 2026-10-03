@@ -1,0 +1,1737 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "gzetryn",
+  "description": "GMGN web-data service for ZetrynAI: KOL/smart-money directory, wallet trade feed, token intel. Loopback only. Contract: docs/contract.md.",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/health": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Health",
+    "operationId": "health_health_get",
+    "parameters": [
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/stats": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Stats",
+    "operationId": "stats_v1_stats_get",
+    "parameters": [
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/admin/refresh": {
+   "post": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Admin Refresh",
+    "operationId": "admin_refresh_v1_admin_refresh_post",
+    "parameters": [
+     {
+      "name": "curate",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Curate"
+      }
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/admin/curate": {
+   "post": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Admin Curate",
+    "operationId": "admin_curate_v1_admin_curate_post",
+    "parameters": [
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/wallets": {
+   "get": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Wallets",
+    "operationId": "wallets_v1_wallets_get",
+    "parameters": [
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "curated",
+        "manual",
+        "active",
+        "ranked",
+        "inactive",
+        "all"
+       ],
+       "type": "string",
+       "default": "active",
+       "title": "Status"
+      }
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[A-Za-z0-9_:.-]{1,32}$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tag"
+      }
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 64
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "capped by the server's max_limit",
+       "default": 500,
+       "title": "Limit"
+      },
+      "description": "capped by the server's max_limit"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Add Wallet",
+    "operationId": "add_wallet_v1_wallets_post",
+    "parameters": [
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ManualWallet"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/wallets/{address}": {
+   "get": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Wallet",
+    "operationId": "wallet_v1_wallets__address__get",
+    "parameters": [
+     {
+      "name": "address",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+       "description": "Solana address (base58, 32-44 chars)",
+       "title": "Address"
+      },
+      "description": "Solana address (base58, 32-44 chars)"
+     },
+     {
+      "name": "trades",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 0,
+       "default": 20,
+       "title": "Trades"
+      }
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Patch Wallet",
+    "operationId": "patch_wallet_v1_wallets__address__patch",
+    "parameters": [
+     {
+      "name": "address",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+       "description": "Solana address (base58, 32-44 chars)",
+       "title": "Address"
+      },
+      "description": "Solana address (base58, 32-44 chars)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ManualWalletPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Delete Wallet",
+    "operationId": "delete_wallet_v1_wallets__address__delete",
+    "parameters": [
+     {
+      "name": "address",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+       "description": "Solana address (base58, 32-44 chars)",
+       "title": "Address"
+      },
+      "description": "Solana address (base58, 32-44 chars)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/wallets/{address}/history": {
+   "get": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Wallet History",
+    "operationId": "wallet_history_v1_wallets__address__history_get",
+    "parameters": [
+     {
+      "name": "address",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+       "description": "Solana address (base58, 32-44 chars)",
+       "title": "Address"
+      },
+      "description": "Solana address (base58, 32-44 chars)"
+     },
+     {
+      "name": "period",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "7d",
+          "30d"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Period"
+      }
+     },
+     {
+      "name": "days",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 365,
+       "minimum": 1,
+       "default": 30,
+       "title": "Days"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "capped by the server's max_limit",
+       "default": 1000,
+       "title": "Limit"
+      },
+      "description": "capped by the server's max_limit"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/wallets/{address}/stats": {
+   "get": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Wallet Stats",
+    "operationId": "wallet_stats_v1_wallets__address__stats_get",
+    "parameters": [
+     {
+      "name": "address",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+       "description": "Solana address (base58, 32-44 chars)",
+       "title": "Address"
+      },
+      "description": "Solana address (base58, 32-44 chars)"
+     },
+     {
+      "name": "max_age_sec",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "accept cached GMGN data up to this age (seconds)",
+       "title": "Max Age Sec"
+      },
+      "description": "accept cached GMGN data up to this age (seconds)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/curation": {
+   "get": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Curation",
+    "operationId": "curation_v1_curation_get",
+    "parameters": [
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/curation/runs": {
+   "get": {
+    "tags": [
+     "directory"
+    ],
+    "summary": "Curation Runs",
+    "operationId": "curation_runs_v1_curation_runs_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 10,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/leaderboard": {
+   "get": {
+    "tags": [
+     "leaderboard"
+    ],
+    "summary": "Leaderboard",
+    "operationId": "leaderboard_v1_leaderboard_get",
+    "parameters": [
+     {
+      "name": "period",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "7d",
+        "30d"
+       ],
+       "type": "string",
+       "default": "30d",
+       "title": "Period"
+      }
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "kol",
+        "smart_degen",
+        "all"
+       ],
+       "type": "string",
+       "default": "all",
+       "title": "Tag"
+      }
+     },
+     {
+      "name": "sort",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "profit",
+        "pnl",
+        "winrate"
+       ],
+       "type": "string",
+       "default": "profit",
+       "title": "Sort"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "capped by the server's max_limit",
+       "default": 100,
+       "title": "Limit"
+      },
+      "description": "capped by the server's max_limit"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/leaderboard/copy": {
+   "get": {
+    "tags": [
+     "leaderboard"
+    ],
+    "summary": "Leaderboard Copy",
+    "operationId": "leaderboard_copy_v1_leaderboard_copy_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "capped by the server's max_limit",
+       "default": 50,
+       "title": "Limit"
+      },
+      "description": "capped by the server's max_limit"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/feed": {
+   "get": {
+    "tags": [
+     "feed"
+    ],
+    "summary": "Feed",
+    "operationId": "feed_v1_feed_get",
+    "parameters": [
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "last seq already consumed (0 = from the start)",
+       "title": "After"
+      },
+      "description": "last seq already consumed (0 = from the start)"
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "alias of `after`",
+       "title": "Since"
+      },
+      "description": "alias of `after`"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "capped by the server's max_limit",
+       "default": 500,
+       "title": "Limit"
+      },
+      "description": "capped by the server's max_limit"
+     },
+     {
+      "name": "wait",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "number",
+       "maximum": 30,
+       "minimum": 0,
+       "description": "long-poll seconds when nothing is new",
+       "default": 0,
+       "title": "Wait"
+      },
+      "description": "long-poll seconds when nothing is new"
+     },
+     {
+      "name": "wallet",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Wallet"
+      }
+     },
+     {
+      "name": "mint",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Mint"
+      }
+     },
+     {
+      "name": "side",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "buy",
+          "sell"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Side"
+      }
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[A-Za-z0-9_:.-]{1,32}$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tag"
+      }
+     },
+     {
+      "name": "baseline",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Baseline"
+      }
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/token/{mint}": {
+   "get": {
+    "tags": [
+     "token"
+    ],
+    "summary": "Token",
+    "operationId": "token_v1_token__mint__get",
+    "parameters": [
+     {
+      "name": "mint",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+       "description": "Solana address (base58, 32-44 chars)",
+       "title": "Mint"
+      },
+      "description": "Solana address (base58, 32-44 chars)"
+     },
+     {
+      "name": "parts",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "comma list of: info,launchpad,security,dev,dev_history,holders,smart_traders,feed",
+       "title": "Parts"
+      },
+      "description": "comma list of: info,launchpad,security,dev,dev_history,holders,smart_traders,feed"
+     },
+     {
+      "name": "max_age_sec",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "accept cached GMGN data up to this age (seconds)",
+       "title": "Max Age Sec"
+      },
+      "description": "accept cached GMGN data up to this age (seconds)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/market/trending": {
+   "get": {
+    "tags": [
+     "market"
+    ],
+    "summary": "Trending",
+    "operationId": "trending_v1_market_trending_get",
+    "parameters": [
+     {
+      "name": "interval",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "1m",
+        "5m",
+        "1h",
+        "6h",
+        "24h"
+       ],
+       "type": "string",
+       "default": "1h",
+       "title": "Interval"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "max_age_sec",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "accept cached GMGN data up to this age (seconds)",
+       "title": "Max Age Sec"
+      },
+      "description": "accept cached GMGN data up to this age (seconds)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/market/new-pairs": {
+   "get": {
+    "tags": [
+     "market"
+    ],
+    "summary": "New Pairs",
+    "operationId": "new_pairs_v1_market_new_pairs_get",
+    "parameters": [
+     {
+      "name": "interval",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "1m",
+        "5m",
+        "1h",
+        "6h",
+        "24h"
+       ],
+       "type": "string",
+       "default": "1h",
+       "title": "Interval"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "max_age_sec",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "accept cached GMGN data up to this age (seconds)",
+       "title": "Max Age Sec"
+      },
+      "description": "accept cached GMGN data up to this age (seconds)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/market/pump": {
+   "get": {
+    "tags": [
+     "market"
+    ],
+    "summary": "Pump",
+    "operationId": "pump_v1_market_pump_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 30,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "max_age_sec",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "accept cached GMGN data up to this age (seconds)",
+       "title": "Max Age Sec"
+      },
+      "description": "accept cached GMGN data up to this age (seconds)"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "ManualWallet": {
+    "properties": {
+     "address": {
+      "type": "string",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+      "title": "Address"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 128
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "tags": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "pattern": "^[A-Za-z0-9_:.-]{1,32}$"
+        },
+        "type": "array",
+        "maxItems": 20
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tags"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "address"
+    ],
+    "title": "ManualWallet"
+   },
+   "ManualWalletPatch": {
+    "properties": {
+     "label": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 128
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "tags": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "pattern": "^[A-Za-z0-9_:.-]{1,32}$"
+        },
+        "type": "array",
+        "maxItems": 20
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tags"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "title": "ManualWalletPatch"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}
