@@ -107,6 +107,20 @@ class FeedStore:
             )
         async with self._sessions() as s, s.begin():
             await s.execute(text("select pg_advisory_xact_lock(:k)"), {"k": FEED_LOCK})
+            # skip rows we already have, so re-polled pages do not burn sequence values (ON CONFLICT still guards)
+            known = {
+                tuple(x)
+                for x in (
+                    await s.execute(
+                        select(Trade.tx_hash, Trade.mint, Trade.side, Trade.token_amount).where(
+                            Trade.wallet == ctx.address, Trade.tx_hash.in_({v["tx_hash"] for v in values})
+                        )
+                    )
+                ).all()
+            }
+            values = [v for v in values if (v["tx_hash"], v["mint"], v["side"], v["token_amount"]) not in known]
+            if not values:
+                return []
             stmt = (
                 insert(Trade)
                 .values(values)

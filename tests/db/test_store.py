@@ -139,6 +139,7 @@ async def test_feed_idempotent_ordered_baseline_and_cursor(sessions):
     assert {x.tx_hash for x in new} == {"tx-old", "tx1", "tx2"}
     again = await feed.insert(ctx(started), [t1, t2], seen_at=T0 + timedelta(seconds=90))
     assert again == []
+    assert await feed.last_seq() == 3  # known rows are filtered before the insert: no sequence values burned
     rows, cur = await feed.read(0)
     assert [r["tx_hash"] for r in rows] == ["tx1", "tx2"]  # baseline hidden by default, seq follows trade time
     assert rows[0]["lag_sec"] == pytest.approx(20.0) and rows[0]["label"] == "lbl"

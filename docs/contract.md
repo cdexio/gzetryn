@@ -58,7 +58,8 @@ watch {started_at, last_poll_at, last_poll_ok_at, last_poll_error, last_trade_at
 - Events with `seq > after`, ascending. Keep `next_cursor` and pass it as `after` next time (`since` is accepted
   as an alias). `wait` long-polls up to 30 s when nothing is new.
 - `next_cursor` also moves past events your filters excluded, and `seq` values commit in order, so following the
-  cursor never skips an event. `meta.last_seq` is the newest seq overall.
+  cursor never skips an event. `meta.last_seq` is the newest seq overall. `seq` is increasing but not dense
+  (gaps are normal); never infer "missed events" from a gap.
 - `tag` matches the wallet's GMGN tags or its manual tags (as frozen in the event).
 
 Event: `seq, trade_at (block time), seen_at (our poll), lag_sec (seen − trade), wallet, wallet_name,
