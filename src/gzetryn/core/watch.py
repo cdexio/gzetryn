@@ -18,10 +18,19 @@ def tier(last_trade_at: datetime | None, now: datetime, t: WatchTunables) -> str
     return "cold"
 
 
-def interval(last_trade_at: datetime | None, now: datetime, t: WatchTunables) -> float:
-    return {"hot": t.hot_interval_sec, "warm": t.warm_interval_sec}.get(
-        tier(last_trade_at, now, t), t.cold_interval_sec
-    )
+def interval(last_trade_at: datetime | None, now: datetime, t: WatchTunables, fallback: bool = False) -> float:
+    """Polling interval by tier; `fallback` = the on-chain trigger is healthy, so interval polls only catch misses."""
+    k = tier(last_trade_at, now, t)
+    if fallback:
+        return {"hot": t.fallback_hot_interval_sec, "warm": t.fallback_warm_interval_sec}.get(
+            k, t.fallback_cold_interval_sec
+        )
+    return {"hot": t.hot_interval_sec, "warm": t.warm_interval_sec}.get(k, t.cold_interval_sec)
+
+
+def next_retry(attempt: int, delays: list[float]) -> float | None:
+    """Delay before triggered retry number `attempt` (1-based) while a notified tx is not indexed yet; None = stop."""
+    return delays[attempt - 1] if 1 <= attempt <= len(delays) else None
 
 
 def want_next_page(

@@ -89,6 +89,23 @@ async def test_watcher_poll_feeds_events(client):
     assert await rt.watcher.poll(WALLET) == 0  # idempotent
 
 
+async def test_triggered_poll_resolves_signature(client):
+    rt = client.rt
+    await client.post("/v1/wallets", headers=H, json={"address": WALLET})
+    await rt.watcher.reload()
+    assert rt.trigger is not None and rt.trigger.summary()["wallets"] == 1
+    sig = "45G5viAvp2PdN7wELCBoJryThidWK6t1qSsRC5PpguzXBiqVoSF19zwo8CQbss4WJQRdDy63b3kiZ8iuUSJ33wjP"  # in fixture
+    rt.watcher.on_trade(WALLET, sig, 1)
+    rt.watcher.on_trade(WALLET, "not-indexed-yet", 1)
+    await rt.watcher.poll(WALLET, "trigger")
+    s = rt.watcher.summary()["trigger"]
+    assert s["trigger_polls"] == 1 and s["hits"] == 1 and s["pending_wallets"] == 1
+    r = await client.get("/v1/feed", headers=H, params={"after": 0, "baseline": "true"})
+    assert {e["payload"]["source"] for e in r.json()["data"]} == {"trigger"}
+    h = (await client.get("/health", headers=H)).json()
+    assert "trigger" in h["components"]
+
+
 async def test_token_intel_all_parts(client):
     r = await client.get(f"/v1/token/{MINT}", headers=H)
     assert r.status_code == 200, r.text

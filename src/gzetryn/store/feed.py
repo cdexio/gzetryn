@@ -188,6 +188,24 @@ class FeedStore:
                     ).where(Trade.seen_at >= since)
                 )
             ).one()
+            src = Trade.payload["source"].astext
+            by_source = {
+                (name or "unknown"): {
+                    "events": n,
+                    "lag_sec_p50": None if p50 is None else round(p50, 2),
+                    "lag_sec_p90": None if p90 is None else round(p90, 2),
+                }
+                for name, n, p50, p90 in await s.execute(
+                    select(
+                        src,
+                        func.count(),
+                        func.percentile_cont(0.5).within_group(Trade.lag_sec),
+                        func.percentile_cont(0.9).within_group(Trade.lag_sec),
+                    )
+                    .where(Trade.seen_at >= since, Trade.baseline.is_(False))
+                    .group_by(src)
+                )
+            }
             return {
                 "events": row[0],
                 "live_events": row[1],
@@ -195,4 +213,5 @@ class FeedStore:
                 "last_seen_at": iso(row[3]),
                 "lag_sec_p50": row[4],
                 "lag_sec_p90": row[5],
+                "live_by_source": by_source,
             }

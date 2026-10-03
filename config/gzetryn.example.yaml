@@ -33,9 +33,22 @@ directory:
 watch:
   hot_window_sec: 1800
   warm_window_sec: 86400
-  hot_interval_sec: 45
+  hot_interval_sec: 45          # while the on-chain trigger is down
   warm_interval_sec: 90
   cold_interval_sec: 300
+  fallback_hot_interval_sec: 120  # while the trigger is healthy (it only catches misses)
+  fallback_warm_interval_sec: 300
+  fallback_cold_interval_sec: 900
+
+trigger:                  # on-chain trigger (spec §6.1); free public endpoint, verified 2026-10-03
+  enabled: true
+  ws_url: wss://api.mainnet-beta.solana.com
+  commitment: confirmed
+  debounce_sec: 1
+  retry_delays_sec: [2, 4, 8, 16]
+  max_wait_sec: 30
+  min_gap_sec: 2
+  max_polls_per_min: 10   # per wallet
   page_limit: 20
   max_pages: 3
   max_concurrent: 2

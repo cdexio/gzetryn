@@ -68,6 +68,7 @@ async def run_conn(url: str, commitment: str, wallets: list[str], until: float, 
                             "c": commitment, "wallet": subs.get(p["subscription"]), "sig": v["signature"],
                             "err": v["err"] is not None, "slot": p["result"]["context"]["slot"], "t": now,
                             "nlogs": len(v.get("logs") or []),
+                            **({"logs": v.get("logs")} if v["err"] is None and st.get("keep_logs") else {}),
                         })
                         st["bytes"] += len(raw)
         except Exception as e:  # noqa: BLE001
@@ -97,6 +98,7 @@ async def main() -> None:
     ap.add_argument("--http", default=HTTP)
     ap.add_argument("--out", default=None)
     ap.add_argument("--commitments", default="processed,confirmed")
+    ap.add_argument("--keep-logs", action="store_true", help="store the logs of ok (err=null) notifications")
     a = ap.parse_args()
     wallets = [w.strip() for w in open(a.wallets) if w.strip()]
     until = time.time() + a.minutes * 60
@@ -104,7 +106,7 @@ async def main() -> None:
     stats = {}
     tasks = []
     for c in a.commitments.split(","):
-        stats[c] = {"connects": 0, "acks": 0, "sub_errors": [], "disconnects": [], "bytes": 0}
+        stats[c] = {"connects": 0, "acks": 0, "sub_errors": [], "disconnects": [], "bytes": 0, "keep_logs": a.keep_logs}
         tasks.append(run_conn(a.ws, c, wallets, until, rec, stats[c]))
     await asyncio.gather(*tasks)
     if a.out:

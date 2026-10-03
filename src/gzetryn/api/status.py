@@ -88,6 +88,17 @@ class RuntimeStatus:
                 wa.update(status="degraded", reason="no ok poll in 15 min")
         c["watcher"] = wa
 
+        if rt.trigger is None:
+            c["trigger"] = {"status": "disabled"}
+        else:
+            tr = {"status": "ok", **rt.trigger.summary()}
+            if not tr["connected"]:
+                if up > 60:
+                    tr.update(status="degraded", reason="websocket not connected; interval polling at normal pace")
+            elif not tr["healthy"] and w["active_wallets"] and up > 60:
+                tr.update(status="degraded", reason="not every active wallet is subscribed")
+            c["trigger"] = tr
+
         statuses = [v["status"] for v in c.values()]
         overall = "broken" if "broken" in statuses else "degraded" if "degraded" in statuses else "ok"
         return {

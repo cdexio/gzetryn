@@ -19,6 +19,7 @@ from gzetryn.store.feed import FeedStore
 from gzetryn.store.ops import OpsStore
 from gzetryn.store.wallets import WalletStore
 from gzetryn.transport.http import HttpTransport
+from gzetryn.trigger.solana_ws import WsTrigger
 
 log = get_logger("gzetryn.runtime")
 
@@ -49,7 +50,11 @@ class Runtime:
         self.budget = Budget(self.t.budget, self.clock)
         self.gateway = Gateway(self.t, self.transport, self.budget, hooks=SampleHooks(self.ops, self.clock), clock=self.clock)
         self.directory = Directory(self.t, self.gateway, self.wallets, self.clock)
-        self.watcher = Watcher(self.t.watch, self.gateway, self.wallets, self.feed, self.clock)
+        self.watcher = Watcher(self.t.watch, self.gateway, self.wallets, self.feed, self.clock, self.t.trigger)
+        self.trigger: WsTrigger | None = None
+        if self.t.trigger.enabled:
+            self.trigger = WsTrigger(self.t.trigger, self.watcher.on_trade, self.clock)
+            self.watcher.trigger = self.trigger
         self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed)
         self._flushed: Counter = Counter()
         self._flushed_lat: defaultdict = defaultdict(float)
@@ -64,6 +69,8 @@ class Runtime:
             self._tasks.append(asyncio.create_task(self.directory.run(), name="directory"))
         if self.t.watch.enabled:
             self._tasks.append(asyncio.create_task(self.watcher.run(), name="watcher"))
+            if self.trigger is not None:
+                self._tasks.append(asyncio.create_task(self.trigger.run(), name="trigger"))
         self._tasks.append(asyncio.create_task(self._every(60, self._flush_counts), name="counts"))
         self._tasks.append(
             asyncio.create_task(self._every(self.t.retention.interval_sec, self._retention, 900), name="retention")
@@ -96,6 +103,8 @@ class Runtime:
     async def stop(self) -> None:
         self.directory.stop()
         self.watcher.stop()
+        if self.trigger is not None:
+            self.trigger.stop()
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)

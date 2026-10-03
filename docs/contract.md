@@ -74,9 +74,16 @@ Semantics:
 
 - **`baseline = true`**: the trade happened before the wallet became active (history picked up by the first poll).
   It is not a signal; it is hidden unless `baseline=true` is asked.
-- Polling: hot wallets (trade in the last 30 min) every ~45 s, warm (24 h) ~90 s, cold ~300 s, so `lag_sec` is
-  usually under 1–2 min for active traders (a cold wallet's first trade can take up to ~5 min). Use `trade_at`
-  and `lag_sec` to judge freshness. A wallet's `watch.last_poll_ok_at` shows gaps; trades during a gap
+- **Lag**: `lag_sec = seen_at − trade_at`, where `trade_at` is GMGN's block time in **whole seconds** (so `lag_sec`
+  overstates the true delay by 0–1 s) and `seen_at` is when gzetryn fetched the trade; the event is in the feed a
+  few milliseconds later. A long-poll `/v1/feed?wait=25` returns it in the same second.
+- How trades are found: an on-chain trigger (free Solana WebSocket, `logsSubscribe` per active wallet) sees the
+  wallet's transaction ~1–2 s after the block and gzetryn polls GMGN for that wallet right away (retries until GMGN
+  has indexed it, ≤ 30 s). Typical `lag_sec` is a few seconds; it grows only by GMGN's own indexing delay. If the
+  trigger is down or missed a transaction, interval polling catches the trade (every 120/300/900 s by recency while
+  the trigger is healthy, 45/90/300 s while it is down), with a larger `lag_sec`. `payload.source` says which path
+  found the event (`trigger` | `interval`); `payload.notified` (`swap` | `filtered`) and `payload.notified_at` are
+  set when the WebSocket saw the transaction. `/health` → `components.trigger` shows whether the fast path is up. A wallet's `watch.last_poll_ok_at` shows gaps; trades during a gap
   arrive late (larger `lag_sec`), never twice.
 - Identity: `(wallet, tx_hash, mint, side, token_amount)`.
 
@@ -119,7 +126,7 @@ its reason in `errors.{part}`; the call fails only when every GMGN part failed.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /health` | `status ok\|degraded\|broken`, `revision`, components `db`, `gmgn` (pause, throttles, last ok), `directory` (last refresh), `curation` (curated/manual counts, last run), `watcher` (active wallets, tiers, polls, events) |
-| `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome, average latency, req/min), last 24 h from the database (incl. throttled count), budget, cache, job summaries, wallet counts, feed 24 h (events, live events, lag p50/p90) |
+| `GET /health` | `status ok\|degraded\|broken`, `revision`, components `db`, `gmgn` (pause, throttles, last ok), `directory` (last refresh), `curation` (curated/manual counts, last run), `watcher` (active wallets, tiers, mode, polls, events, trigger counters), `trigger` (connected, healthy, subscriptions, reconnects, notifications) |
+| `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome, average latency, req/min), last 24 h from the database (incl. throttled count), budget, cache, job summaries (`watcher.trigger`: polls, hits, timeouts, caps, notification→GMGN-index p50/p90, coverage), wallet counts, feed 24 h (events, live events, lag p50/p90 overall and `live_by_source`) |
 | `POST /v1/admin/refresh?curate=false` | run a rank refresh now (optionally the curation too) |
 | `POST /v1/admin/curate` | run the curation now from the latest snapshots |

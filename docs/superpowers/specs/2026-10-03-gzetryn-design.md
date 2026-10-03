@@ -190,6 +190,51 @@ polls exactly the active set.
   wallet's last stored trade, the next page is fetched (`cursor`), up to
   `watch.max_pages` = 3, so a burst of trades between polls is not lost.
 
+### 6.1 On-chain trigger (owner decision 2026-10-03: "real-time, at most a few seconds")
+
+Faster GMGN interval polling is rejected (38 wallets every ~5 s ≈ 450
+req/min, ~4× the rate proven clean; a Cloudflare block of the VPS IP would
+stop everything). Instead a free Solana WebSocket says *when* a wallet
+transacted, and GMGN is polled only then.
+
+- Endpoint: `wss://api.mainnet-beta.solana.com` (free, no key), verified
+  from the VPS (phase 7 report): 43 subscriptions on one connection, 0
+  disconnects in 10 min, notifications 1.1–1.7 s after the whole-second
+  block time, every GMGN trade in the window notified. `confirmed`
+  commitment (+0.07 s vs `processed`, no rollback risk). Not used: the
+  engine's Alchemy (≈ 83 % of its free quota), Helius WS (metered).
+- One connection, one `logsSubscribe {mentions: [wallet]}` per **active**
+  wallet, kept in sync with the active set (subscribe/unsubscribe on
+  reload); reconnect with backoff 1 → 60 s and resubscribe everything.
+- A notification with `err` ≠ null is dropped (99 % of the traffic: bot
+  wallets spamming failed transactions). A successful one is **swap-like**
+  when its logs show a token `Transfer`/`TransferChecked` plus an
+  instruction containing buy/sell/swap/route/exact-in/out (or a Raydium
+  `ray_log`). Others (account setup, SOL transfers, fee claims, bot
+  programs without token transfers) are skipped but remembered, so a later
+  trade with that signature is counted as a classifier miss.
+- Swap-like for wallet W → GMGN `wallet_activity` poll of W after
+  `trigger.debounce_sec` = 1 s; if the signature is not in GMGN's page yet,
+  retry after 2, 4, 8, 16 s, giving up after `max_wait_sec` = 30 s. One
+  poll serves every pending signature of the wallet. Per wallet ≥
+  `min_gap_sec` = 2 s between triggered polls and ≤ `max_polls_per_min` =
+  10; above the cap the trade is left to fallback polling.
+- GMGN remains the only source of events (symbol, USD, price). No event is
+  created from the WebSocket, so there is never a second event for a
+  trade. Decoding swaps from the transaction itself was not built: it needs
+  a `getTransaction` per notification on the rate-limited public HTTP RPC
+  and would duplicate GMGN's enrichment for a gain of ~1–2 s.
+- Interval polling stays as the fallback: while the trigger is healthy
+  (connected, every active wallet subscribed) hot/warm/cold run at
+  120/300/900 s; when it is not, at the normal 45/90/300 s (due times are
+  pulled in at once when the trigger goes down).
+- Each event's payload records `source` (`trigger` | `interval`) and, when
+  the WebSocket saw the signature, `notified` (`swap` | `filtered`) and
+  `notified_at`. `/v1/stats` and `/health` expose connection state,
+  reconnects, notification counts, trigger polls, hits, time from
+  notification to GMGN index, timeouts, caps, coverage (notified / filtered
+  / not notified) and live lag p50/p90 per source.
+
 ### Events
 
 - Identity: `(wallet, tx_hash, mint, side, token_amount)`; inserts are
@@ -374,6 +419,7 @@ measured; the soak report records what was observed.
 | 4 — Watcher + feed | adaptive polling, trades, baseline, paging | live trades in the feed within 10 min |
 | 5 — Token intel + API | token endpoint, leaderboards, market lists, stats, contract | all endpoints answer; contract + OpenAPI written |
 | 6 — Deploy + verify | setup, deploy, service, soak check | service active, checks in section 13 of the report pass |
+| 7 — On-chain trigger | verify free WS, trigger module, watcher integration, stats, contract | end-to-end lag measured; GMGN rate and reconnects reported |
 
 ## 16. Risks
 
@@ -387,7 +433,11 @@ measured; the soak report records what was observed.
 - **Rank composition**: KOL tags are GMGN's labels; curation inherits
   their mistakes. Thresholds are config; every run is stored.
 - **Feed completeness**: a wallet with > 60 trades between two polls
-  loses the excess (3 pages × 20). Hot wallets are polled every 60 s; the
-  bot-pace filter keeps such wallets out of the curated set.
+  loses the excess (3 pages × 20). The trigger polls within seconds of a
+  trade; the bot-pace filter keeps such wallets out of the curated set.
+- **Public WebSocket**: free, unauthenticated, no SLA; it may drop or rate
+  limit. The watcher falls back to normal interval polling automatically;
+  `/health` shows `trigger` degraded. A free alternative can be set with
+  `trigger.ws_url` without code changes.
 - **Predictive value**: unmeasured; the engine measures it from the feed
   before any of it trades.

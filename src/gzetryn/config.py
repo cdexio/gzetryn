@@ -94,16 +94,37 @@ class WatchTunables(BaseModel):
     reload_sec: float = 60.0  # active set reload from the store
     hot_window_sec: int = 1800  # last trade within → hot
     warm_window_sec: int = 86400  # last trade within → warm, else cold
-    # first soak (60/180/600 s): live lag p50 122 s, 10.8 req/min → tightened; est. ~20 req/min for 38 wallets
+    # intervals used while the on-chain trigger is NOT healthy (first soak at 60/180/600 s: lag p50 122 s)
     hot_interval_sec: float = 45.0
     warm_interval_sec: float = 90.0
     cold_interval_sec: float = 300.0
+    # fallback intervals while the trigger is healthy (it catches trades within seconds; these catch misses)
+    fallback_hot_interval_sec: float = 120.0
+    fallback_warm_interval_sec: float = 300.0
+    fallback_cold_interval_sec: float = 900.0
     jitter_frac: float = 0.15
     page_limit: int = Field(20, ge=1, le=50)
     max_pages: int = Field(3, ge=1, le=10)
     max_concurrent: int = Field(2, ge=1)
     first_spread_sec: float = 120.0  # first polls after start are spread over this window
-    tick_sec: float = 1.0
+    tick_sec: float = 0.25
+
+
+class TriggerTunables(BaseModel):
+    """On-chain trigger (spec §6.1). Free public endpoint verified 2026-10-03 (phase 7 report)."""
+
+    enabled: bool = True
+    ws_url: str = "wss://api.mainnet-beta.solana.com"
+    commitment: str = "confirmed"  # measured: +0.07 s vs processed, no rollback risk
+    ping_interval_sec: float = 20.0
+    reconnect_min_sec: float = 1.0
+    reconnect_max_sec: float = 60.0
+    debounce_sec: float = 1.0  # first GMGN poll this long after the notification
+    retry_delays_sec: list[float] = Field(default_factory=lambda: [2.0, 4.0, 8.0, 16.0])  # while the tx is not indexed
+    max_wait_sec: float = 30.0  # give up on a notified signature after this (fallback polling still runs)
+    min_gap_sec: float = 2.0  # between two triggered polls of one wallet
+    max_polls_per_min: int = 10  # triggered polls per wallet per minute; above → left to fallback polling
+    sig_cache_sec: float = 1800.0  # notified signatures remembered for coverage stats
 
 
 class TokenTunables(BaseModel):
@@ -140,6 +161,7 @@ class Tunables(BaseModel):
     curation: CurationTunables = Field(default_factory=CurationTunables)
     directory: DirectoryTunables = Field(default_factory=DirectoryTunables)
     watch: WatchTunables = Field(default_factory=WatchTunables)
+    trigger: TriggerTunables = Field(default_factory=TriggerTunables)
     token: TokenTunables = Field(default_factory=TokenTunables)
     copy_score: CopyScoreTunables = Field(default_factory=CopyScoreTunables)
     retention: RetentionTunables = Field(default_factory=RetentionTunables)
