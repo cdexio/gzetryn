@@ -13,12 +13,14 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 
 
 class BudgetTunables(BaseModel):
-    per_minute: int = Field(40, ge=1)  # sustained requests per minute to GMGN, all priorities together
-    burst: int = Field(8, ge=1)  # token bucket capacity
+    # cap on requests per minute to GMGN, all priorities together (phase 0: 120/min ran clean; real use ~20-30/min)
+    per_minute: int = Field(60, ge=1)
+    burst: int = Field(15, ge=1)  # token bucket capacity
     min_gap_sec: float = Field(0.3, ge=0)  # minimum time between two request starts
-    reserve_p1: float = 2.0  # tokens P1 leaves for P0
-    reserve_p2: float = 4.0  # tokens P2 leaves for P0/P1
-    max_wait_sec: dict[str, float] = Field(default_factory=lambda: {"P0": 10.0, "P1": 60.0, "P2": 120.0})
+    # the feed poller (P1) leaves 8 tokens so a cold /v1/token call (10 GMGN calls) is served from the burst
+    reserve_p1: float = 8.0
+    reserve_p2: float = 10.0  # tokens P2 (rank, metrics) leaves for P0/P1
+    max_wait_sec: dict[str, float] = Field(default_factory=lambda: {"P0": 20.0, "P1": 60.0, "P2": 120.0})
     throttle_pause_sec: float = 120.0  # first pause after 429/403, doubles
     throttle_pause_max_sec: float = 1800.0
     throttle_reset_sec: float = 1800.0  # clean time after which the pause resets to the first step

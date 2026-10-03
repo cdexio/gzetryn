@@ -2,11 +2,12 @@
 # every key is optional and defaults to the value shown. All numbers are [TUNABLE] (spec §12) unless measured.
 
 budget:
-  per_minute: 40          # sustained GMGN requests/min, all priorities (phase 0: 120/min tested clean)
-  burst: 8
+  per_minute: 60          # cap on GMGN requests/min, all priorities (phase 0: 120/min tested clean)
+  burst: 15
   min_gap_sec: 0.3
-  reserve_p1: 2           # tokens the feed poller leaves for API calls
-  reserve_p2: 4           # tokens rank/metrics jobs leave for API calls and the poller
+  reserve_p1: 8           # tokens the feed poller leaves for API calls (a cold /v1/token = 10 calls)
+  reserve_p2: 10          # tokens rank/metrics jobs leave for API calls and the poller
+  max_wait_sec: {P0: 20, P1: 60, P2: 120}
   throttle_pause_sec: 120 # first pause after a 429/403, doubles up to throttle_pause_max_sec
   throttle_pause_max_sec: 1800
 

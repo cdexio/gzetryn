@@ -76,7 +76,7 @@ From `phase-0-report.md`:
 | Stack | Python 3.14, uv, curl_cffi (`impersonate="chrome"`), FastAPI + uvicorn, SQLAlchemy 2 async + asyncpg + Alembic, click, pydantic-settings + YAML, JSON logs to journald |
 | Storage | PostgreSQL 16 on the VPS, port 5433, peer auth, one role + one database `gzetryn`. DB tests run in the schema `gzetryn_test` of that database (no second database) |
 | API | `127.0.0.1:8793`, `X-Consumer` header on every request (including `/health`), bscout-style envelope |
-| Rate | Sustained ≤ 40 req/min `[TUNABLE]`, burst 8, ≥ 0.3 s between request starts; P0 (API) > P1 (feed polling) > P2 (rank, stats) |
+| Rate | Cap 60 req/min `[TUNABLE]` (expected use 20–30/min), burst 15, ≥ 0.3 s between request starts; P0 (API) > P1 (feed polling) > P2 (rank, stats) |
 | Curated list | Owner's rule (section 5) with every threshold in config |
 | Deploy | rsync of the clean git tree to `/opt/gzetryn` (no GitHub remote yet), venv `/var/lib/gzetryn/venv`, user `gzetryn`, `gzetryn.service` |
 
@@ -179,7 +179,7 @@ polls exactly the active set.
   24 h) 180 s, **cold** 600 s. Due wallets are polled oldest-due first, at
   most 2 at a time, priority P1, with jitter so polls do not bunch.
 - Expected load for 50–60 active wallets: ~15–25 req/min, inside the
-  40 req/min budget with room for API calls.
+  60 req/min cap with room for API calls.
 - A poll = `wallet_activity` with `limit = 20`, `type=buy&type=sell`. When
   every row of the page is new **and** the oldest row is newer than the
   wallet's last stored trade, the next page is fetched (`cursor`), up to
@@ -273,12 +273,16 @@ Retention `[TUNABLE]`: `rank_snapshots` 180 days, `request_log` 30 days,
 
 ## 10. Budget, pacing and errors
 
-- **Budget**: token bucket, `budget.per_minute` = 40, capacity
-  `budget.burst` = 8, and `budget.min_gap_sec` = 0.3 between request
-  starts (all `[TUNABLE]`). P0 may take the last token, P1 leaves
-  `reserve_p1` = 2, P2 leaves `reserve_p2` = 4. Waits are bounded per
-  priority (P0 10 s, P1 60 s, P2 120 s); a P0 call that cannot be served
-  returns cached data with `stale: true` or `503` + `Retry-After`.
+- **Budget**: token bucket, `budget.per_minute` = 60 (cap; half the
+  120/min that ran clean in phase 0), capacity `budget.burst` = 15, and
+  `budget.min_gap_sec` = 0.3 between request starts (all `[TUNABLE]`).
+  P0 may take the last token, P1 leaves `reserve_p1` = 8 (so a cold
+  `/v1/token`, 10 calls, is served from the burst), P2 leaves
+  `reserve_p2` = 10. Waits are bounded per priority (P0 20 s, P1 60 s,
+  P2 120 s); a P0 call that cannot be served returns cached data with
+  `stale: true` or `503` + `Retry-After`. (First deploy ran 40/min,
+  burst 8, P1 reserve 2: a cold token call during the watcher's first
+  round waited > 10 s and lost a part — raised the same day.)
 - **Classification** (phase 0 codes):
 
 | Answer | Action |
