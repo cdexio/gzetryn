@@ -1,0 +1,48 @@
+{
+ "code": 0,
+ "reason": "",
+ "message": "success",
+ "data": {
+  "address": "8HQgEcbhR5Xoh735zvndAocCLd7wdAYJfWHV55J8pump",
+  "is_show_alert": false,
+  "top_10_holder_rate": "0.1604",
+  "renounced_mint": true,
+  "renounced_freeze_account": true,
+  "burn_ratio": "1",
+  "burn_status": "burn",
+  "dev_token_burn_amount": "0",
+  "dev_token_burn_ratio": "0",
+  "hide_risk": false,
+  "buy_tax": "0",
+  "sell_tax": "0",
+  "lock_summary": {
+   "is_locked": true,
+   "lock_detail": [
+    {
+     "percent": "0.95",
+     "pool": "0x0000000000000000000000000000000000000000",
+     "is_blackhole": true
+    }
+   ],
+   "lock_tags": null,
+   "lock_percent": "0",
+   "left_lock_percent": "0"
+  },
+  "tax_allocation": {
+   "dev_fee": "0",
+   "dividend": "1",
+   "burn_rate": "0",
+   "liquidity": "0",
+   "marketing": "0",
+   "giggle_charity": "0",
+   "binance_charity": "0",
+   "dividend_tokens": [
+    {
+     "address": "So11111111111111111111111111111111111111112",
+     "share": "1",
+     "distribution_type": "direct"
+    }
+   ]
+  }
+ }
+}

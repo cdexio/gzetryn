@@ -1,0 +1,42 @@
+{
+ "code": 0,
+ "reason": "",
+ "message": "success",
+ "data": {
+  "avatar": "https://gmgn.ai/defi/images/twitter/744e4a2cd48650713d97584dd9311828.jpg",
+  "name": "",
+  "ens": "",
+  "tag": "",
+  "tags": [
+   "bullx",
+   "kol",
+   "axiom"
+  ],
+  "tag_rank": {
+   "axiom": 0,
+   "bullx": 0,
+   "kol": 0
+  },
+  "nick_name": "",
+  "created_at": 1739688977,
+  "twitter_name": "ozark",
+  "twitter_username": "ohzarke",
+  "is_blue_verified": true,
+  "twitter_bind": true,
+  "twitter_fans_num": 21886,
+  "twitter_description": "( -_•) ▄︻デ══━一 💥",
+  "followers_count": 21886,
+  "twitter_id": "1863143741835689984",
+  "bind_status": "bind",
+  "verified": true,
+  "follow_count": 24737,
+  "remark_count": 16750,
+  "created_token_count": 111,
+  "fund_from": "",
+  "fund_from_ts": 1777347031,
+  "fund_tx_hash": "4x7WoXnMT2CJ5p1JER4BVcRtAPXmUJdbmbrvxBE38rFyMnUDkhgZYBzJ1GdF6NZVAPjnsmw1EEmPTMydTRDPFnjX",
+  "wallet_address": "",
+  "fund_from_address": "AxiomRXZAq1Jgjj9pHmNqVP7Lhu67wLXZJZbaK87TTSk",
+  "fund_amount": "0.39364334"
+ }
+}

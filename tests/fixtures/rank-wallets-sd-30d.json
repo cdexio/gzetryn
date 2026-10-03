@@ -1,0 +1,586 @@
+{
+ "code": 0,
+ "msg": "success",
+ "data": {
+  "rank": [
+   {
+    "address": "BprdjjAzFLoS2gVJqUVR1pdJpwCacNK4kctLTiMmcdSh",
+    "arc_balance": "951.026189622",
+    "avatar": "",
+    "avg_cost_1d": "166.9627702323428398",
+    "avg_cost_30d": "134.9580568804129936",
+    "avg_cost_7d": "157.6595782381027653",
+    "avg_holding_period_1d": 126278.7012987013,
+    "avg_holding_period_30d": 783901.3506053268,
+    "avg_holding_period_7d": 207611.6581632653,
+    "balance": "951.026189622",
+    "buy": 592,
+    "buy_1d": 94,
+    "buy_30d": 5156,
+    "buy_7d": 592,
+    "daily_profit_7d": [
+     {
+      "timestamp": 1790380800,
+      "profit": "16635.99441842844043983061"
+     },
+     {
+      "timestamp": 1790467200,
+      "profit": "1683.75875353124100434453"
+     },
+     {
+      "timestamp": 1790553600,
+      "profit": "-1124.86226458352813283478"
+     },
+     {
+      "timestamp": 1790640000,
+      "profit": "-784.90779073046917848516"
+     },
+     {
+      "timestamp": 1790726400,
+      "profit": "2508.10286592178621704681"
+     },
+     {
+      "timestamp": 1790812800,
+      "profit": "920.13808492357755111443"
+     },
+     {
+      "timestamp": 1790899200,
+      "profit": "1647.58237238805015343805"
+     }
+    ],
+    "eth_balance": "951.026189622",
+    "follow_count": 3492,
+    "hyperevm_balance": "951.026189622",
+    "last_active": 1791001645,
+    "monad_balance": "951.026189622",
+    "name": "",
+    "net_inflow_1d": "55.51812174516",
+    "net_inflow_30d": "-202302.72181567042",
+    "net_inflow_7d": "737.5578161879",
+    "nickname": "",
+    "pnl_1d": "0.1870936974031219",
+    "pnl_2x_5x_num_7d": 5,
+    "pnl_30d": "0.1949429963103168",
+    "pnl_7d": "0.0628754688326447",
+    "pnl_gt_5x_num_7d": 4,
+    "pnl_lt_2x_num_7d": 192,
+    "pnl_lt_minus_dot5_num_7d": 47,
+    "pnl_minus_dot5_0x_num_7d": 175,
+    "realized_profit_1d": "2425.73975598354333848485",
+    "realized_profit_30d": "181567.25565508114032631075",
+    "realized_profit_7d": "5947.66253919819862129939",
+    "remark_count": 3632,
+    "robinhood_balance": "951.026189622",
+    "sell": 577,
+    "sell_1d": 86,
+    "sell_30d": 5688,
+    "sell_7d": 577,
+    "sol_balance": "951.026189622",
+    "tags": [
+     "launchpad_smart",
+     "smart_degen",
+     "padre",
+     "arbitrager",
+     "bluechip_owner",
+     "axiom"
+    ],
+    "trx_balance": "951.026189622",
+    "twitch_channel_name": "",
+    "twitter_description": "",
+    "twitter_name": "",
+    "twitter_username": "",
+    "txs": 1169,
+    "txs_1d": 180,
+    "txs_30d": 10844,
+    "txs_7d": 1169,
+    "volume_1d": "31085.61413702798457169414",
+    "volume_30d": "1808797.39752759779333493049",
+    "volume_7d": "193876.45795024004620820578",
+    "wallet_address": "BprdjjAzFLoS2gVJqUVR1pdJpwCacNK4kctLTiMmcdSh",
+    "winrate_1d": 0.42105263157894735,
+    "winrate_30d": 0.37214137214137216,
+    "winrate_7d": 0.36023054755043227,
+    "xlayer_balance": "951.026189622"
+   },
+   {
+    "address": "5wHBg65RsM9t2tu4Bqn8xUTwP9X1q1jgf67WDMXsTmT5",
+    "arc_balance": "0.16717891",
+    "avatar": "",
+    "avg_cost_1d": "",
+    "avg_cost_30d": "128.4249089774409478",
+    "avg_cost_7d": "104.9851358204189414",
+    "avg_holding_period_1d": 164828.45454545456,
+    "avg_holding_period_30d": 377227.23903312447,
+    "avg_holding_period_7d": 51851.338461538464,
+    "balance": "0.16717891",
+    "buy": 693,
+    "buy_1d": 0,
+    "buy_30d": 3403,
+    "buy_7d": 693,
+    "daily_profit_7d": [
+     {
+      "timestamp": 1790380800,
+      "profit": "582.00853808837969214114"
+     },
+     {
+      "timestamp": 1790467200,
+      "profit": "-1154.32004391519994546419"
+     },
+     {
+      "timestamp": 1790553600,
+      "profit": "58.31386061529854591776"
+     },
+     {
+      "timestamp": 1790640000,
+      "profit": "-944.81593574930506783444"
+     },
+     {
+      "timestamp": 1790726400,
+      "profit": "-86.92380073207811238225"
+     },
+     {
+      "timestamp": 1790812800,
+      "profit": "0"
+     },
+     {
+      "timestamp": 1790899200,
+      "profit": "0"
+     }
+    ],
+    "eth_balance": "0.16717891",
+    "follow_count": 1505,
+    "hyperevm_balance": "0.16717891",
+    "last_active": 1790987208,
+    "monad_balance": "0.16717891",
+    "name": "",
+    "net_inflow_1d": "0",
+    "net_inflow_30d": "17083.08758112918",
+    "net_inflow_7d": "3659.7684481492",
+    "nickname": "",
+    "pnl_1d": "0",
+    "pnl_2x_5x_num_7d": 0,
+    "pnl_30d": "0.3193017901721771",
+    "pnl_7d": "-0.0289944717885585",
+    "pnl_gt_5x_num_7d": 0,
+    "pnl_lt_2x_num_7d": 106,
+    "pnl_lt_minus_dot5_num_7d": 15,
+    "pnl_minus_dot5_0x_num_7d": 90,
+    "realized_profit_1d": "0",
+    "realized_profit_30d": "136244.98948634872060613137",
+    "realized_profit_7d": "-2127.74591978128457976312",
+    "remark_count": 1720,
+    "robinhood_balance": "0.16717891",
+    "sell": 419,
+    "sell_1d": 0,
+    "sell_30d": 2551,
+    "sell_7d": 419,
+    "sol_balance": "0.16717891",
+    "tags": [
+     "smart_degen",
+     "arbitrager",
+     "axiom"
+    ],
+    "trx_balance": "0.16717891",
+    "twitch_channel_name": "",
+    "twitter_description": "",
+    "twitter_name": "",
+    "twitter_username": "",
+    "txs": 1112,
+    "txs_1d": 0,
+    "txs_30d": 5954,
+    "txs_7d": 1112,
+    "volume_1d": "0",
+    "volume_30d": "999971.55863874232612301303",
+    "volume_7d": "144011.49130806087051698958",
+    "wallet_address": "5wHBg65RsM9t2tu4Bqn8xUTwP9X1q1jgf67WDMXsTmT5",
+    "winrate_1d": 0,
+    "winrate_30d": 0.28546861564918313,
+    "winrate_7d": 0.4,
+    "xlayer_balance": "0.16717891"
+   },
+   {
+    "address": "BeEN5iWBiEfJsNthuQnQKkKVWg9YkygcQHebNGoVUzik",
+    "arc_balance": "238.836662007",
+    "avatar": "",
+    "avg_cost_1d": "97.2238582448797305",
+    "avg_cost_30d": "209.5943105151849261",
+    "avg_cost_7d": "190.9607661203383425",
+    "avg_holding_period_1d": 202722.38461538462,
+    "avg_holding_period_30d": 333490.56560636184,
+    "avg_holding_period_7d": 368694.74672489084,
+    "balance": "238.836662007",
+    "buy": 349,
+    "buy_1d": 125,
+    "buy_30d": 2687,
+    "buy_7d": 349,
+    "daily_profit_7d": [
+     {
+      "timestamp": 1790380800,
+      "profit": "7070.88543165379303278133"
+     },
+     {
+      "timestamp": 1790467200,
+      "profit": "10818.33901907539945068053"
+     },
+     {
+      "timestamp": 1790553600,
+      "profit": "8452.70119719587348576"
+     },
+     {
+      "timestamp": 1790640000,
+      "profit": "5413.96681224362824274501"
+     },
+     {
+      "timestamp": 1790726400,
+      "profit": "-4004.85691926520358559288"
+     },
+     {
+      "timestamp": 1790812800,
+      "profit": "91.55279664094726550354"
+     },
+     {
+      "timestamp": 1790899200,
+      "profit": "11493.30884647945910145185"
+     }
+    ],
+    "eth_balance": "238.836662007",
+    "follow_count": 1092,
+    "hyperevm_balance": "238.836662007",
+    "last_active": 1791000868,
+    "monad_balance": "238.836662007",
+    "name": "",
+    "net_inflow_1d": "18.41341790826",
+    "net_inflow_30d": "-187691.05333361106",
+    "net_inflow_7d": "-47167.05144640441",
+    "nickname": "",
+    "pnl_1d": "0.5808801050435065",
+    "pnl_2x_5x_num_7d": 3,
+    "pnl_30d": "0.2000111861853366",
+    "pnl_7d": "0.3959141201254791",
+    "pnl_gt_5x_num_7d": 4,
+    "pnl_lt_2x_num_7d": 84,
+    "pnl_lt_minus_dot5_num_7d": 59,
+    "pnl_minus_dot5_0x_num_7d": 102,
+    "realized_profit_1d": "10779.54504751771550799389",
+    "realized_profit_30d": "130017.93275475067136249668",
+    "realized_profit_7d": "31191.81660347486419562651",
+    "remark_count": 1003,
+    "robinhood_balance": "238.836662007",
+    "sell": 669,
+    "sell_1d": 353,
+    "sell_30d": 2998,
+    "sell_7d": 669,
+    "sol_balance": "238.836662007",
+    "tags": [
+     "smart_degen",
+     "arbitrager",
+     "axiom"
+    ],
+    "trx_balance": "238.836662007",
+    "twitch_channel_name": "",
+    "twitter_description": "",
+    "twitter_name": "",
+    "twitter_username": "",
+    "txs": 1018,
+    "txs_1d": 478,
+    "txs_30d": 5685,
+    "txs_7d": 1018,
+    "volume_1d": "41489.7906152054077159867",
+    "volume_30d": "1340247.40635262821889854033",
+    "volume_7d": "176621.42344721882435558575",
+    "wallet_address": "BeEN5iWBiEfJsNthuQnQKkKVWg9YkygcQHebNGoVUzik",
+    "winrate_1d": 0.3333333333333333,
+    "winrate_30d": 0.28942307692307695,
+    "winrate_7d": 0.29694323144104806,
+    "xlayer_balance": "238.836662007"
+   },
+   {
+    "address": "A2XqEiR18CMSk5CQwt6gsKwCnw1Xduyn4BDLnRmWZ18s",
+    "arc_balance": "359.286399256",
+    "avatar": "",
+    "avg_cost_1d": "92.2897085493099064",
+    "avg_cost_30d": "196.3088918777025744",
+    "avg_cost_7d": "184.5729332432667666",
+    "avg_holding_period_1d": 345253.2926829268,
+    "avg_holding_period_30d": 330554.963891675,
+    "avg_holding_period_7d": 401690.7811158798,
+    "balance": "359.286399256",
+    "buy": 361,
+    "buy_1d": 135,
+    "buy_30d": 2609,
+    "buy_7d": 361,
+    "daily_profit_7d": [
+     {
+      "timestamp": 1790380800,
+      "profit": "27815.86203784403094836579"
+     },
+     {
+      "timestamp": 1790467200,
+      "profit": "0"
+     },
+     {
+      "timestamp": 1790553600,
+      "profit": "8899.09656627506849184674"
+     },
+     {
+      "timestamp": 1790640000,
+      "profit": "-6515.62376951831859820738"
+     },
+     {
+      "timestamp": 1790726400,
+      "profit": "-1889.97249362303777179093"
+     },
+     {
+      "timestamp": 1790812800,
+      "profit": "174.9486046055305945836"
+     },
+     {
+      "timestamp": 1790899200,
+      "profit": "14782.54016725419072772449"
+     }
+    ],
+    "eth_balance": "359.286399256",
+    "follow_count": 1129,
+    "hyperevm_balance": "359.286399256",
+    "last_active": 1791000869,
+    "monad_balance": "359.286399256",
+    "name": "",
+    "net_inflow_1d": "17.19740740967",
+    "net_inflow_30d": "-106942.68882474884",
+    "net_inflow_7d": "-32354.00433824641",
+    "nickname": "",
+    "pnl_1d": "0.8155118269728956",
+    "pnl_2x_5x_num_7d": 4,
+    "pnl_30d": "0.2111390200219983",
+    "pnl_7d": "0.1906409503966234",
+    "pnl_gt_5x_num_7d": 5,
+    "pnl_lt_2x_num_7d": 82,
+    "pnl_lt_minus_dot5_num_7d": 61,
+    "pnl_minus_dot5_0x_num_7d": 105,
+    "realized_profit_1d": "14022.80237609799503273738",
+    "realized_profit_30d": "121542.90200258918918223313",
+    "realized_profit_7d": "14462.68868246864060412818",
+    "remark_count": 1015,
+    "robinhood_balance": "359.286399256",
+    "sell": 696,
+    "sell_1d": 362,
+    "sell_30d": 2931,
+    "sell_7d": 696,
+    "sol_balance": "359.286399256",
+    "tags": [
+     "smart_degen",
+     "arbitrager",
+     "axiom"
+    ],
+    "trx_balance": "359.286399256",
+    "twitch_channel_name": "",
+    "twitter_description": "",
+    "twitter_name": "",
+    "twitter_username": "",
+    "txs": 1057,
+    "txs_1d": 497,
+    "txs_30d": 5540,
+    "txs_7d": 1057,
+    "volume_1d": "43677.00685022963262719597",
+    "volume_30d": "1208280.86020454294670286626",
+    "volume_7d": "156957.01203387373559769102",
+    "wallet_address": "A2XqEiR18CMSk5CQwt6gsKwCnw1Xduyn4BDLnRmWZ18s",
+    "winrate_1d": 0.38461538461538464,
+    "winrate_30d": 0.30896686159844056,
+    "winrate_7d": 0.2801724137931034,
+    "xlayer_balance": "359.286399256"
+   },
+   {
+    "address": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+    "arc_balance": "33.125436448",
+    "avatar": "",
+    "avg_cost_1d": "133.471536125509869",
+    "avg_cost_30d": "138.8260705361883606",
+    "avg_cost_7d": "140.6547375773896689",
+    "avg_holding_period_1d": 260175.625,
+    "avg_holding_period_30d": 371294.1253158161,
+    "avg_holding_period_7d": 337614.94670406735,
+    "balance": "33.125436448",
+    "buy": 1953,
+    "buy_1d": 262,
+    "buy_30d": 4806,
+    "buy_7d": 1953,
+    "daily_profit_7d": [
+     {
+      "timestamp": 1790380800,
+      "profit": "8798.96549399788601554789"
+     },
+     {
+      "timestamp": 1790467200,
+      "profit": "6771.40526724407843937194"
+     },
+     {
+      "timestamp": 1790553600,
+      "profit": "4708.9199993983636137485"
+     },
+     {
+      "timestamp": 1790640000,
+      "profit": "9990.03538100391328997819"
+     },
+     {
+      "timestamp": 1790726400,
+      "profit": "5429.87961370554428278299"
+     },
+     {
+      "timestamp": 1790812800,
+      "profit": "859.36092597238611696806"
+     },
+     {
+      "timestamp": 1790899200,
+      "profit": "4581.513790327107013224"
+     }
+    ],
+    "eth_balance": "33.125436448",
+    "follow_count": 3467,
+    "hyperevm_balance": "33.125436448",
+    "last_active": 1791001735,
+    "monad_balance": "33.125436448",
+    "name": "",
+    "net_inflow_1d": "-1736.61418301889",
+    "net_inflow_30d": "-117681.70337067717",
+    "net_inflow_7d": "-39216.98292175249",
+    "nickname": "",
+    "pnl_1d": "0.1254485846186821",
+    "pnl_2x_5x_num_7d": 11,
+    "pnl_30d": "0.1556984055702105",
+    "pnl_7d": "0.118111556502982",
+    "pnl_gt_5x_num_7d": 1,
+    "pnl_lt_2x_num_7d": 475,
+    "pnl_lt_minus_dot5_num_7d": 26,
+    "pnl_minus_dot5_0x_num_7d": 211,
+    "realized_profit_1d": "4601.99643550081211833888",
+    "realized_profit_30d": "108579.56770654225287519213",
+    "realized_profit_7d": "33519.55567154035514807369",
+    "remark_count": 2997,
+    "robinhood_balance": "33.125436448",
+    "sell": 782,
+    "sell_1d": 103,
+    "sell_30d": 2196,
+    "sell_7d": 782,
+    "sol_balance": "33.125436448",
+    "tags": [
+     "smart_degen"
+    ],
+    "trx_balance": "33.125436448",
+    "twitch_channel_name": "",
+    "twitter_description": "",
+    "twitter_name": "",
+    "twitter_username": "",
+    "txs": 2735,
+    "txs_1d": 365,
+    "txs_30d": 7002,
+    "txs_7d": 2735,
+    "volume_1d": "76255.8621989628589415401",
+    "volume_30d": "1472614.85583015984511137888",
+    "volume_7d": "592013.9904659713520422644",
+    "wallet_address": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+    "winrate_1d": 0.5853658536585366,
+    "winrate_30d": 0.6268357810413885,
+    "winrate_7d": 0.5931623931623932,
+    "xlayer_balance": "33.125436448"
+   },
+   {
+    "address": "AC44afvZ8zpWa3CXBM1iCQEcPVktaPck4qYG8vKfiYi6",
+    "arc_balance": "60.782334235",
+    "avatar": "",
+    "avg_cost_1d": "163.4086396450817879",
+    "avg_cost_30d": "204.3501269200191593",
+    "avg_cost_7d": "193.5048141716640929",
+    "avg_holding_period_1d": 85804.87323943662,
+    "avg_holding_period_30d": 380071.2772988506,
+    "avg_holding_period_7d": 292013.9808306709,
+    "balance": "60.782334235",
+    "buy": 541,
+    "buy_1d": 159,
+    "buy_30d": 1917,
+    "buy_7d": 541,
+    "daily_profit_7d": [
+     {
+      "timestamp": 1790380800,
+      "profit": "1246.20184681563023062541"
+     },
+     {
+      "timestamp": 1790467200,
+      "profit": "-2585.08101763183786832001"
+     },
+     {
+      "timestamp": 1790553600,
+      "profit": "-526.56353241873009151672"
+     },
+     {
+      "timestamp": 1790640000,
+      "profit": "-7828.63040384312782407913"
+     },
+     {
+      "timestamp": 1790726400,
+      "profit": "5184.4500717722520051857"
+     },
+     {
+      "timestamp": 1790812800,
+      "profit": "-2341.45399002386011759004"
+     },
+     {
+      "timestamp": 1790899200,
+      "profit": "8386.40607248902658796628"
+     }
+    ],
+    "eth_balance": "60.782334235",
+    "follow_count": 320,
+    "hyperevm_balance": "60.782334235",
+    "last_active": 1790999360,
+    "monad_balance": "60.782334235",
+    "name": "",
+    "net_inflow_1d": "124.01499951284",
+    "net_inflow_30d": "-34196.64929547994",
+    "net_inflow_7d": "-5898.51497989708",
+    "nickname": "",
+    "pnl_1d": "0.328220389363358",
+    "pnl_2x_5x_num_7d": 8,
+    "pnl_30d": "0.3302766124871028",
+    "pnl_7d": "0.0048587206789056",
+    "pnl_gt_5x_num_7d": 2,
+    "pnl_lt_2x_num_7d": 122,
+    "pnl_lt_minus_dot5_num_7d": 66,
+    "pnl_minus_dot5_0x_num_7d": 137,
+    "realized_profit_1d": "8928.89907044839435591122",
+    "realized_profit_30d": "107769.69990068243146153039",
+    "realized_profit_7d": "557.26263604628365139328",
+    "remark_count": 248,
+    "robinhood_balance": "60.782334235",
+    "sell": 785,
+    "sell_1d": 321,
+    "sell_30d": 2181,
+    "sell_7d": 785,
+    "sol_balance": "60.782334235",
+    "tags": [
+     "smart_degen",
+     "arbitrager",
+     "axiom",
+     "padre"
+    ],
+    "trx_balance": "60.782334235",
+    "twitch_channel_name": "",
+    "twitter_description": "",
+    "twitter_name": "",
+    "twitter_username": "",
+    "txs": 1326,
+    "txs_1d": 480,
+    "txs_30d": 4098,
+    "txs_7d": 1326,
+    "volume_1d": "60953.09357026378386520957",
+    "volume_30d": "800166.28258705969520149214",
+    "volume_7d": "217202.6591234789167883092",
+    "wallet_address": "AC44afvZ8zpWa3CXBM1iCQEcPVktaPck4qYG8vKfiYi6",
+    "winrate_1d": 0.4142857142857143,
+    "winrate_30d": 0.3489827856025039,
+    "winrate_7d": 0.30847457627118646,
+    "xlayer_balance": "60.782334235"
+   }
+  ]
+ }
+}

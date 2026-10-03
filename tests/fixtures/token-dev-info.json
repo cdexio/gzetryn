@@ -1,0 +1,32 @@
+{
+ "code": 0,
+ "reason": "",
+ "message": "success",
+ "data": {
+  "address": "8HQgEcbhR5Xoh735zvndAocCLd7wdAYJfWHV55J8pump",
+  "creator_address": "",
+  "creator_token_balance": "",
+  "creator_token_status": "creator_close",
+  "twitter_name_change_history": [],
+  "top_10_holder_rate": "0.1604",
+  "dexscr_ad": 0,
+  "dexscr_update_link": 1,
+  "cto_flag": 1,
+  "dexscr_boost_fee": 0,
+  "dexscr_trending_bar": 0,
+  "dexscr_ad_ts": 0,
+  "dexscr_update_link_ts": 0,
+  "dexscr_boost_ts": 0,
+  "dexscr_trending_bar_ts": 0,
+  "twitter_del_post_token_count": 0,
+  "twitter_create_token_count": 0,
+  "fund_from": "",
+  "fund_from_ts": 0,
+  "creator_open_count": 0,
+  "offchain": false,
+  "twitter_change_flag": false,
+  "twitter_created_count": 0,
+  "twitter_del_post_count": 0,
+  "twitter_rename_count": 0
+ }
+}

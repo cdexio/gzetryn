@@ -1,0 +1,17 @@
+{
+ "code": 0,
+ "reason": "",
+ "message": "success",
+ "data": {
+  "smart_degen_count": 7,
+  "renowned_count": 2,
+  "fresh_wallet_count": 945,
+  "dex_bot_count": 1000,
+  "insider_count": 2,
+  "following_count": 0,
+  "dev_count": 4,
+  "bluechip_owner_count": 4,
+  "bundler_count": 692,
+  "sniper_count": 21
+ }
+}

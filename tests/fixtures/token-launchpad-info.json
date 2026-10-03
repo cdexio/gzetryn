@@ -1,0 +1,15 @@
+{
+ "code": 0,
+ "reason": "",
+ "message": "success",
+ "data": {
+  "address": "8HQgEcbhR5Xoh735zvndAocCLd7wdAYJfWHV55J8pump",
+  "launchpad": "pump",
+  "launchpad_status": 1,
+  "launchpad_progress": "1",
+  "description": "",
+  "launchpad_platform": "Pump.fun",
+  "migrated_pool_exchange": "pump_amm",
+  "launch_quote_address": "So11111111111111111111111111111111111111112"
+ }
+}
