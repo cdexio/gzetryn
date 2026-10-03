@@ -81,6 +81,7 @@ class CurationTunables(BaseModel):
     min_pnl_30d: float = 0.0  # pnl_30d (ROI ratio) must be > this
     min_winrate_30d: float = 0.50  # >=
     max_trades_per_day: float = 150.0  # (buy_30d + sell_30d) / 30 <= this; above = bot-paced
+    min_trades_30d: int = 20  # buy_30d + sell_30d >= this (owner decision 2026-10-03: too few trades = no evidence)
     min_candidates: int = 50  # fewer candidates (failed rank fetch) → run skipped, nothing changes
 
 

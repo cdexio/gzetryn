@@ -134,7 +134,10 @@ A candidate passes when **all** hold (`[TUNABLE]` values in config):
    `pnl_30d` > `curation.min_pnl_30d` = 0;
 3. `winrate_30d` ≥ `curation.min_winrate_30d` = 0.50;
 4. not bot-paced: `(buy_30d + sell_30d) / 30` ≤
-   `curation.max_trades_per_day` = 150.
+   `curation.max_trades_per_day` = 150;
+5. enough evidence: `buy_30d + sell_30d` ≥ `curation.min_trades_30d` = 20
+   (owner decision 2026-10-03, after the first run curated a wallet with a
+   1.00 win rate on ~12 trades; `min_winrate_30d` stays 0.50).
 
 Passing wallets are ordered by `realized_profit_30d` (GMGN's 30d PnL)
 descending; the first `curation.top_n` = 50 are **curated**.

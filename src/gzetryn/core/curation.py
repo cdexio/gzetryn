@@ -1,8 +1,8 @@
 """Curated list rule (spec §5, owner decision 2026-10-03 "recommended"). Pure: no I/O.
 
 Candidates = wallets in the latest snapshot of any configured list. Pass = tag kol|smart_degen, 30d realized profit
-> min, 30d PnL ratio > min, 30d win rate >= min, trades/day <= max. Order by 30d realized profit (GMGN's "PnL"),
-take the top N.
+> min, 30d PnL ratio > min, 30d win rate >= min, trades/day <= max, 30d trades >= min (owner, 2026-10-03). Order by
+30d realized profit (GMGN's "PnL"), take the top N.
 """
 
 from __future__ import annotations
@@ -56,6 +56,8 @@ def check(c: Candidate, t: CurationTunables) -> str | None:
     tpd = c.trades_per_day
     if tpd is None or tpd > t.max_trades_per_day:
         return "bot_paced"
+    if (c.buy_30d or 0) + (c.sell_30d or 0) < t.min_trades_30d:
+        return "few_trades"
     return None
 
 

@@ -28,7 +28,8 @@ A wallet's `status` is `curated`, `manual`, `curated+manual`, `ranked` (in the l
 
 **Curated list** (owner decision 2026-10-03, values in config): candidates = every wallet in the latest GMGN rank
 lists `kol` and `smart_degen` × `7d` and `30d` (100 each, refreshed hourly). Pass = tag kol|smart_degen,
-`realized_profit_30d > 0`, `pnl_30d > 0`, `winrate_30d ≥ 0.50`, `(buy_30d + sell_30d)/30 ≤ 150`. Ordered by
+`realized_profit_30d > 0`, `pnl_30d > 0`, `winrate_30d ≥ 0.50`, `(buy_30d + sell_30d)/30 ≤ 150`,
+`buy_30d + sell_30d ≥ 20`. Ordered by
 `realized_profit_30d` (GMGN's "PnL"), top 50, rebuilt daily. A wallet that drops out gets `curated = false` and
 `uncurated_at`; nothing is ever deleted. Manual wallets are never removed by curation.
 

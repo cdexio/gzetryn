@@ -28,6 +28,9 @@ def test_curation_rules_in_order():
     assert check(cand("a", buys=2300, sells=2300), t) == "bot_paced"  # 153/day
     assert check(cand("a", buys=2250, sells=2250), t) is None  # exactly 150/day passes
     assert check(cand("a", tags=("smart_degen", "axiom")), t) is None
+    assert check(cand("a", buys=6, sells=6), t) == "few_trades"  # e.g. 1.00 win rate on 12 trades
+    assert check(cand("a", buys=10, sells=10), t) is None  # exactly 20 passes
+    assert check(cand("a", buys=None, sells=None), t) == "bot_paced"  # unknown activity never passes
 
 
 def test_curate_orders_by_profit_and_caps():

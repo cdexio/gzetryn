@@ -24,6 +24,7 @@ curation:                 # owner decision 2026-10-03 ("recommended")
   min_pnl_30d: 0          # pnl_30d (ROI ratio) > this
   min_winrate_30d: 0.50   # >=
   max_trades_per_day: 150 # (buy_30d + sell_30d) / 30 <= this
+  min_trades_30d: 20      # buy_30d + sell_30d >= this (owner 2026-10-03)
   min_candidates: 50      # fewer → run skipped
 
 directory:
