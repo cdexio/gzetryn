@@ -56,10 +56,13 @@ From `phase-0-report.md`:
   100 rows max; GMGN's "PnL" order is **realized USD profit**.
 - Wallet trades: `/vas/api/v1/wallet_activity/sol?wallet=&limit=&type=buy&type=sell&cursor=`,
   near real-time (newest buy 30 s old for an active wallet).
-- Token intel: `mutil_window_token_info` (POST), `token_security_sol`,
-  `token_dev_info`, `dev_created_tokens`, `token_stat`,
-  `token_holder_stat`, `token_trader_stat`, `token_launchpad_info`,
-  `token_traders?tag=renowned|smart_degen`.
+- Token intel: `mutil_window_token_info` (POST), `multi_token_info`
+  (POST, creator + launchpad), `token_security_sol`, `token_dev_info`,
+  `dev_created_tokens`, `token_stat`, `token_holder_stat`,
+  `token_trader_stat`, `token_traders?tag=renowned|smart_degen`.
+- Wallet metrics without a rank row: `walletNew?period=30d` (real
+  profit/PnL/buys/sells, win rate null); `wallet_stat/{period}` returns
+  zeros without login.
 - Market: swaps rank (trending), `new_pairs`, POST `/vas/api/v1/rank/sol`
   (pump.fun new / completing / completed).
 - Rate: 150 requests at 1–2 req/s, all 200, p50 0.25 s; no rate-limit
@@ -153,8 +156,10 @@ descending; the first `curation.top_n` = 50 are **curated**.
   strings, e.g. `insider`, `friend`) and note; `added_by` = consumer.
 - On add and every `directory.manual_metrics_sec` = 21600 `[TUNABLE]`, a
   manual wallet that is not in the latest rank snapshot gets its metrics
-  from `wallet_stat/sol/{addr}/30d` and identity from
-  `wallet_common_stat` (P2), `metrics_source = wallet_stat`.
+  from `smartmoney/sol/walletNew/{addr}?period=30d` and identity from
+  `wallet_common_stat` (P2), `metrics_source = wallet_new`. Its 30d win
+  rate stays null (GMGN does not expose it without login; anonymous
+  `wallet_stat/{period}` returns zeros — phase 0).
 - Remove (`DELETE` / `wallets remove`) clears the manual flag only.
 
 ### Wallet status (derived)
@@ -221,7 +226,7 @@ calls (TTL per call `[TUNABLE]`):
 | Part | GMGN calls | TTL |
 |---|---|---|
 | `info` (symbol, supply, pool, price + changes, volume/swaps by window, mcap, liquidity, creation/open/migration times) | POST `mutil_window_token_info` | 30 s |
-| `launchpad` (platform, status, bonding progress, migrated exchange) | `token_launchpad_info` | 30 s |
+| `launchpad` (creator address, platform, status, bonding progress, migration mcap, ATH price) | POST `mrwapi/v1/multi_token_info` (its `creator_address` is filled even when `token_dev_info` blanks it) | 30 s |
 | `security` (mint/freeze authority renounced, top 10 rate, burn, taxes, lock, alert) | `token_security_sol` | 120 s |
 | `dev` (creator, balance, status hold/close/sell, fund source, twitter renames, dexscreener flags) | `token_dev_info` | 60 s |
 | `dev_history` (tokens created, migrated vs never migrated, open ratio, ATH token, recent tokens) | `dev_created_tokens/{creator}` | 600 s |
@@ -305,7 +310,7 @@ retry_after_sec?}}` with 400 / 404 / 409 / 503.
 | `GET /v1/wallets?status=curated\|manual\|active\|ranked\|inactive\|all&tag=&q=&limit=` | directory |
 | `GET /v1/wallets/{address}` | one wallet + metrics + watch state + recent trades |
 | `GET /v1/wallets/{address}/history?period=&days=` | rank snapshot series |
-| `GET /v1/wallets/{address}/stats?period=7d\|30d` | live GMGN wallet stat (cached 300 s) |
+| `GET /v1/wallets/{address}/stats` | live GMGN `walletNew?period=30d` (7d and 30d profit, PnL, buys, sells; cached 300 s) |
 | `POST /v1/wallets` `{address, label?, tags?, note?}` | add/update a manual wallet (201 new, 200 existing) |
 | `PATCH /v1/wallets/{address}` `{label?, tags?, note?}` | edit a manual wallet |
 | `DELETE /v1/wallets/{address}` | clear the manual flag (404 if not manual); never deletes data |

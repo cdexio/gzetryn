@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# /usr/local/bin/gzetryn on the VPS: run the gzetryn CLI as the service user with the service's environment.
+# Examples: gzetryn wallets list --status curated | gzetryn wallets add <address> --label x | gzetryn stats
+set -euo pipefail
+cd /opt/gzetryn
+exec sudo -u gzetryn -H env PYTHONDONTWRITEBYTECODE=1 /var/lib/gzetryn/venv/bin/gzetryn "$@"

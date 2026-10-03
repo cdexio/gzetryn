@@ -90,15 +90,21 @@ All `GET` unless marked POST; base `https://gmgn.ai`; chain `sol`.
 
 ### Wallet stats and profile
 
-- `/api/v1/wallet_stat/sol/{addr}/{7d|30d}` → buys/sells/pnl/realized
-  per window, `winrate`, `total_profit`, `balance`, `token_num`,
-  `profit_num`, pnl buckets, `tags[]`, `tag_rank{}`, `twitter_username`,
-  `twitter_name`, `twitter_fans_num`, `followers_count`, `follow_count`,
-  `last_active_timestamp`, `avg_holding_peroid` (sic), `risk{…}`,
-  `creator_created_count`. Used for **manual wallets** that are not in a
-  rank.
-- `/defi/quotation/v1/smartmoney/sol/walletNew/{addr}?period=7d|30d` →
-  older profile shape (twitter + pnl; `winrate` was null for 30d).
+- `/api/v1/wallet_stat/sol/{addr}/{7d|30d|all}` → same field names as
+  below plus `tags[]`, `tag_rank{}`, twitter, `follow_count`,
+  `last_active_timestamp`, `risk{…}`, `creator_created_count`. **Without a
+  login every period metric is 0** (`buy_30d`, `realized_profit_30d`,
+  `pnl_30d`, `winrate` … = 0 for ozark and meechie, whose rank rows show
+  44 529 USD / 2 571 buys); only all-time `buy`/`sell` and identity are
+  real. Not used for metrics.
+- `/defi/quotation/v1/smartmoney/sol/walletNew/{addr}?period=30d` →
+  **real** 7d/30d metrics: `realized_profit_7d/30d`, `pnl_7d/30d`,
+  `buy_7d/30d`, `sell_7d/30d`, `buy`/`sell` (for the period asked),
+  `sol_balance`, `last_active_timestamp`, twitter (`twitter_username`,
+  `twitter_name`, `twitter_fans_num`), `tags`. `winrate` is **null**.
+  Values are close to, not equal to, the rank row (meechie 30d: 54 360 vs
+  44 529 USD; computed at another time). Used for **manual wallets** that
+  are not in a rank (their win rate stays unknown).
 - `/api/v1/wallet_common_stat/sol/{addr}` → `name`, `tags`, twitter
   (`twitter_username`, `twitter_fans_num`, `is_blue_verified`),
   `created_token_count`, `fund_from`, `fund_from_address`,
@@ -116,7 +122,8 @@ All `GET` unless marked POST; base `https://gmgn.ai`; chain `sol`.
 |---|---|---|
 | Info, price, pool, dev (one call) | POST `/api/v1/mutil_window_token_info` body `{"chain":"sol","addresses":[mint]}` → `data[0]` | `symbol`, `name`, `decimals`, `total_supply`, `circulating_supply`, `holder_count`, `liquidity`, `creation_timestamp`, `open_timestamp`, `migrated_timestamp`, `biggest_pool_address`, `pool{exchange, quote_reserve, initial_liquidity, creator, …}`, `price{price, price_1m/5m/1h/6h/24h, buys_*, sells_*, volume_*, swaps_*, hot_level}`, `dev{creator_address, creator_token_balance, creator_token_status, creator_open_count, fund_from, cto_flag, twitter_rename_count, …}`, `launchpad` fields |
 | Security | `/api/v1/token_security_sol/sol/{mint}` | `renounced_mint`, `renounced_freeze_account`, `top_10_holder_rate`, `burn_ratio`, `burn_status`, `dev_token_burn_ratio`, `buy_tax`, `sell_tax`, `is_show_alert`, `lock_summary{is_locked, lock_percent}` |
-| Dev / creator | `/api/v1/token_dev_info/sol/{mint}` | `creator_address`, `creator_token_balance`, `creator_token_status` (e.g. `creator_close`, `creator_hold`), `creator_open_count`, `fund_from`, `fund_from_ts`, dexscreener flags, twitter rename/delete counts |
+| Creator address, launchpad, bonding | POST `/mrwapi/v1/multi_token_info` body `{"chain":"sol","addresses":[mint]}` → `data[0]` | **`creator_address`** (present even when `token_dev_info` blanks it, e.g. CTO tokens), `launchpad`, `launchpad_platform`, `launchpad_status`, `launchpad_progress`, `migration_market_cap`, `migrated_timestamp`, `holder_count`, `liquidity`, `total_supply`, `ath_price` |
+| Dev / creator | `/api/v1/token_dev_info/sol/{mint}` (`creator_address` is `""` for PUDU, a CTO token) | `creator_address`, `creator_token_balance`, `creator_token_status` (e.g. `creator_close`, `creator_hold`), `creator_open_count`, `fund_from`, `fund_from_ts`, dexscreener flags, twitter rename/delete counts |
 | Creator history | `/api/v1/dev_created_tokens/sol/{creator}` | `inner_count` (never migrated), `open_count` (migrated), `open_ratio`, `last_create_timestamp`, `creator_ath_info{ath_token, ath_mc, token_symbol}`, `tokens[]` (≈100: `token_address`, `symbol`, `create_timestamp`, `is_open`, `market_cap`, `token_ath_mc`, `holders`, `launchpad_platform`) |
 | Holder composition (rates) | `/api/v1/token_stat/sol/{mint}` | `holder_count`, `top_10_holder_rate`, `creator_hold_rate`, `dev_team_hold_rate`, `top70_sniper_hold_rate`, `fresh_wallet_rate`, `bot_degen_rate`, `top_bundler_trader_percentage`, `top_rat_trader_percentage` (insider), `top_entrapment_trader_percentage`, `bluechip_owner_percentage`, `creator_created_count` |
 | Holder composition (counts) | `/vas/api/v1/token_holder_stat/sol/{mint}` | `smart_degen_count`, `renowned_count` (KOL), `sniper_count`, `bundler_count`, `insider_count`, `dev_count`, `fresh_wallet_count`, `dex_bot_count`, `bluechip_owner_count`, `following_count` |
@@ -173,7 +180,12 @@ rate, and backs off on the first 429/403.
    `token_traders` calls (renowned, smart_degen) + our own feed.
 4. Holdings and anything under `/pf/` are out of scope (login).
 5. Manual wallets outside the ranks get their metrics from
-   `wallet_stat/{30d}` and identity from `wallet_common_stat`.
+   `walletNew?period=30d` (win rate unknown) and identity from
+   `wallet_common_stat`; `wallet_stat/{period}` is not used for metrics
+   (zeros without login).
+6. Token creator comes from `multi_token_info.creator_address`, which
+   also gives launchpad and bonding progress (replaces
+   `token_launchpad_info` in the token call).
 
 ## Still open
 

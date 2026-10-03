@@ -1,0 +1,25 @@
+# /etc/systemd/system/gzetryn.service — installed by deploy/deploy.sh
+[Unit]
+Description=gzetryn — GMGN web-data service for ZetrynAI (127.0.0.1:8793)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gzetryn
+Group=gzetryn
+WorkingDirectory=/opt/gzetryn
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/var/lib/gzetryn/venv/bin/gzetryn serve
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/gzetryn
+
+[Install]
+WantedBy=multi-user.target

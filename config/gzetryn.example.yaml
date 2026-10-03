@@ -1,0 +1,66 @@
+# gzetryn tunables. Copy to config/gzetryn.yaml (git-ignored, kept by deploy) and change only what you need;
+# every key is optional and defaults to the value shown. All numbers are [TUNABLE] (spec §12) unless measured.
+
+budget:
+  per_minute: 40          # sustained GMGN requests/min, all priorities (phase 0: 120/min tested clean)
+  burst: 8
+  min_gap_sec: 0.3
+  reserve_p1: 2           # tokens the feed poller leaves for API calls
+  reserve_p2: 4           # tokens rank/metrics jobs leave for API calls and the poller
+  throttle_pause_sec: 120 # first pause after a 429/403, doubles up to throttle_pause_max_sec
+  throttle_pause_max_sec: 1800
+
+rank:
+  interval_sec: 3600
+  tags: [kol, smart_degen]
+  periods: [7d, 30d]
+
+curation:                 # owner decision 2026-10-03 ("recommended")
+  interval_sec: 86400
+  top_n: 50
+  tags: [kol, smart_degen]
+  min_profit_30d_usd: 0   # realized_profit_30d > this
+  min_pnl_30d: 0          # pnl_30d (ROI ratio) > this
+  min_winrate_30d: 0.50   # >=
+  max_trades_per_day: 150 # (buy_30d + sell_30d) / 30 <= this
+  min_candidates: 50      # fewer → run skipped
+
+directory:
+  manual_metrics_sec: 21600
+
+watch:
+  hot_window_sec: 1800
+  warm_window_sec: 86400
+  hot_interval_sec: 60
+  warm_interval_sec: 180
+  cold_interval_sec: 600
+  page_limit: 20
+  max_pages: 3
+  max_concurrent: 2
+
+cache:
+  ttl_sec:
+    token_window_info: 30
+    token_multi_info: 30
+    token_security: 120
+    token_dev_info: 60
+    dev_created_tokens: 600
+    token_stat: 45
+    token_holder_stat: 45
+    token_trader_stat: 45
+    token_traders: 45
+    rank_swaps: 20
+    new_pairs: 20
+    pump_lists: 20
+
+copy_score:
+  w_profit: 0.35
+  w_winrate: 0.30
+  w_positive_days: 0.20
+  w_presence: 0.15
+  presence_days: 7
+
+retention:
+  rank_snapshots_days: 180
+  request_log_days: 30
+  samples_days: 7

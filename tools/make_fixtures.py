@@ -34,6 +34,8 @@ RULES = [
     ("rank_sol_swaps_1h_orderby_swaps_direction_desc_limit_20", "rank-swaps-1h.json", "data.rank", 3),
     ("new_pairs_1h", "new-pairs.json", "data.pairs", 3),
     ("POST_vas_api_v1_rank_sol", "trenches.json", None, 0),
+    ("walletNew_9iaawVBEsFG35PSwd4PahwT8fYNQe9XYuRdWm872dUqY_period_30d", "wallet-new-30d.json", None, 0),
+    ("POST_mrwapi_v1_multi_token_info", "token-multi-info.json", None, 0),
 ]
 
 
