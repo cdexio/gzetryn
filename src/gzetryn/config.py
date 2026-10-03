@@ -93,9 +93,10 @@ class WatchTunables(BaseModel):
     reload_sec: float = 60.0  # active set reload from the store
     hot_window_sec: int = 1800  # last trade within → hot
     warm_window_sec: int = 86400  # last trade within → warm, else cold
-    hot_interval_sec: float = 60.0
-    warm_interval_sec: float = 180.0
-    cold_interval_sec: float = 600.0
+    # first soak (60/180/600 s): live lag p50 122 s, 10.8 req/min → tightened; est. ~20 req/min for 38 wallets
+    hot_interval_sec: float = 45.0
+    warm_interval_sec: float = 90.0
+    cold_interval_sec: float = 300.0
     jitter_frac: float = 0.15
     page_limit: int = Field(20, ge=1, le=50)
     max_pages: int = Field(3, ge=1, le=10)

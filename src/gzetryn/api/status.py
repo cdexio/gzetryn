@@ -31,9 +31,15 @@ class RuntimeStatus:
         now = rt.clock.now()
         up = (now - rt.started_at).total_seconds() if rt.started_at else 0.0
         c: dict[str, dict] = {}
+        last_run = None
         try:
             await rt.ops.ping()
             counts = await rt.wallets.counts()
+            runs = await rt.wallets.curation_runs(1)
+            if runs:
+                r = runs[0]
+                last_run = {k: r[k] for k in ("at", "status", "reason", "candidates", "passed", "rejected")}
+                last_run["selected"] = len(r["selected"])
             c["db"] = {"status": "ok"}
         except Exception as e:  # report, never raise: health must answer
             c["db"] = {"status": "broken", "reason": type(e).__name__}
@@ -67,7 +73,7 @@ class RuntimeStatus:
             dr.update(status="degraded", reason="rank refresh older than 3 intervals")
         c["directory"] = dr
 
-        cu = {"status": "ok", "curated": counts.get("curated"), "manual": counts.get("manual"), "last": d.last_curation}
+        cu = {"status": "ok", "curated": counts.get("curated"), "manual": counts.get("manual"), "last": last_run}
         if rt.t.curation.enabled and up > 900 and not counts.get("curated"):
             cu.update(status="degraded", reason="no curated wallets")
         c["curation"] = cu

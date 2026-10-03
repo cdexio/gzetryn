@@ -73,8 +73,9 @@ Semantics:
 
 - **`baseline = true`**: the trade happened before the wallet became active (history picked up by the first poll).
   It is not a signal; it is hidden unless `baseline=true` is asked.
-- Polling: hot wallets (trade in the last 30 min) every ~60 s, warm (24 h) ~180 s, cold ~600 s, so `lag_sec` is
-  usually under 1–3 min for active traders. A wallet's `watch.last_poll_ok_at` shows gaps; trades during a gap
+- Polling: hot wallets (trade in the last 30 min) every ~45 s, warm (24 h) ~90 s, cold ~300 s, so `lag_sec` is
+  usually under 1–2 min for active traders (a cold wallet's first trade can take up to ~5 min). Use `trade_at`
+  and `lag_sec` to judge freshness. A wallet's `watch.last_poll_ok_at` shows gaps; trades during a gap
   arrive late (larger `lag_sec`), never twice.
 - Identity: `(wallet, tx_hash, mint, side, token_amount)`.
 

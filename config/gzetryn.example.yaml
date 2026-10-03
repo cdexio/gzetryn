@@ -32,9 +32,9 @@ directory:
 watch:
   hot_window_sec: 1800
   warm_window_sec: 86400
-  hot_interval_sec: 60
-  warm_interval_sec: 180
-  cold_interval_sec: 600
+  hot_interval_sec: 45
+  warm_interval_sec: 90
+  cold_interval_sec: 300
   page_limit: 20
   max_pages: 3
   max_concurrent: 2

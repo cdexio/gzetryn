@@ -175,10 +175,12 @@ polls exactly the active set.
 - The active set is reloaded from the store every 60 s (picks up
   curation and CLI changes).
 - Each wallet has a due time. Interval by its latest known trade
-  `[TUNABLE]`: **hot** (trade in the last 30 min) 60 s, **warm** (last
-  24 h) 180 s, **cold** 600 s. Due wallets are polled oldest-due first, at
-  most 2 at a time, priority P1, with jitter so polls do not bunch.
-- Expected load for 50–60 active wallets: ~15–25 req/min, inside the
+  `[TUNABLE]`: **hot** (trade in the last 30 min) 45 s, **warm** (last
+  24 h) 90 s, **cold** 300 s. Due wallets are polled oldest-due first, at
+  most 2 at a time, priority P1, with jitter so polls do not bunch. (The
+  first soak ran 60/180/600 s: 10.8 req/min, live lag p50 122 s, p90
+  161 s; tightened the same day.)
+- Expected load for 38–60 active wallets: ~20–30 req/min, inside the
   60 req/min cap with room for API calls.
 - A poll = `wallet_activity` with `limit = 20`, `type=buy&type=sell`. When
   every row of the page is new **and** the oldest row is newer than the
