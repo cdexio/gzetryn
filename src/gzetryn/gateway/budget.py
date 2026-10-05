@@ -56,6 +56,7 @@ class GroupState:
     last_throttle: float = -1e9
     probing: bool = False
     probe_inflight: bool = False
+    level: int = 0  # consecutive throttles without a success in between
     waiting: Counter = field(default_factory=Counter)
     starts: deque = field(default_factory=lambda: deque(maxlen=5000))
     throttles: int = 0
@@ -147,6 +148,8 @@ class Budget:
                 "min_gap_sec": g.t.min_gap_sec,
                 "tokens": round(g.bucket.tokens, 2),
                 "cooling_sec": round(max(0.0, g.cooling_until - now), 1),
+                "cooldown_step_sec": g.step,
+                "cooldown_level": g.level,
                 "probing": g.probing,
                 "throttles": g.throttles,
                 "cooldown_sec_total": round(g.cooldown_sec_total, 1),
@@ -235,10 +238,13 @@ class Budget:
         return True
 
     def ok(self, group: str) -> None:
+        """A real answer from the group: reopen it and reset the cooldown ladder."""
         g = self._group(group)
         if g.probing:
             g.probing = False
             g.probe_inflight = False
+        g.level = 0
+        g.step = 0.0
 
     def released(self, group: str) -> None:
         """A request finished without a verdict on throttling (network error etc.): free the probe slot."""
@@ -250,10 +256,13 @@ class Budget:
         g = self._group(group)
         now = self._clock.monotonic()
         g.last_throttle_windows = self.windows(g)
-        if now - g.last_throttle > self._t.cooldown_reset_sec or g.step <= 0:
+        # escalate on consecutive throttles (each failed probe doubles: 15 s … 300 s … 3600 s); only a success
+        # (ok) resets the ladder — a block outlasting the cooldown must not be probed at a fixed pace forever
+        if g.step <= 0 or (g.level == 0 and now - g.last_throttle > self._t.cooldown_reset_sec):
             g.step = self._t.cooldown_start_sec
         else:
             g.step = min(g.step * 2, self._t.cooldown_max_sec)
+        g.level += 1
         g.cooling_until = max(g.cooling_until, now + g.step)
         g.cooldown_sec_total += g.step
         g.last_throttle = now

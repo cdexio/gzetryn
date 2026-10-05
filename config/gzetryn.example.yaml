@@ -13,8 +13,8 @@ budget:                   # spec §10 (revised 2026-10-05): per path group, stri
   # P0 trigger polls, P1 API (engine), P2 interval polls, P3 background; tokens each leaves free in its group
   reserve: {P0: 0, P1: 0, P2: 1, P3: 2}
   max_wait_sec: {P0: 20, P1: 30, P2: 60, P3: 120}
-  cooldown_start_sec: 15  # per group after a 429/403, doubles up to cooldown_max_sec; one probe afterwards
-  cooldown_max_sec: 300
+  cooldown_start_sec: 15  # per group after a 429/403; doubles on every consecutive throttle; one probe afterwards
+  cooldown_max_sec: 3600  # /vas/ blocks outlast 300 s; reset by the first success
   cooldown_reset_sec: 900
   global_pause_groups: 2  # global pause only when this many groups cool at once
   global_pause_sec: 60

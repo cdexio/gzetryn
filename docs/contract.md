@@ -16,7 +16,7 @@ For the ZetrynAI engine (and the dashboard). Base URL on the VPS: `http://127.0.
 | 400 `missing_consumer` / `invalid_parameter` / `bad_request` | no header, bad address/param, GMGN refused the params |
 | 404 `not_found` | wallet not in the directory / not a manual wallet / GMGN knows no such token |
 | 502 `upstream` | GMGN answered something unusable (changed endpoint) |
-| 503 `unavailable` + `Retry-After` | `message` = `cooldown:<group>` (GMGN's Cloudflare challenged that path group, e.g. `cooldown:vas`; it cools 15 s → 5 min, other groups keep working), `budget` (no slot within the wait limit) or `throttled` (2+ groups cooling: global 60 s pause). Cached data is served with `meta.stale = true` instead when there is any |
+| 503 `unavailable` + `Retry-After` | `message` = `cooldown:<group>` (GMGN's Cloudflare challenged that path group, e.g. `cooldown:vas`; it cools 15 s, doubling on every failed probe up to 1 h, back to normal on the first success; other groups keep working), `budget` (no slot within the wait limit) or `throttled` (2+ groups cooling: global 60 s pause). Cached data is served with `meta.stale = true` instead when there is any |
 
 GMGN path groups (each with its own rate limit and cooldown): `vas` = wallet trades (feed), token holder/trader
 stats, smart traders, pump.fun lists; `api` = token info/stat/security/dev/dev history, new pairs; `defi` = wallet
@@ -185,7 +185,7 @@ For browsing; the engine should use `/v1/market/candidates`. Verified fields 202
 
 | Endpoint | Returns |
 |---|---|
-| `GET /health` | `status ok\|degraded\|broken`, `revision`, components `db`, `gmgn` (`global_paused_sec`, `cooling_groups {group: sec}`, throttles, global pauses, last ok), `directory` (last refresh), `curation` (curated/manual counts, last run), `watcher` (active wallets, tiers, mode, polls, events, trigger counters), `trigger` (connected, healthy, subscriptions, reconnects, notifications) |
+| `GET /health` | `status ok\|degraded\|broken`, `revision`, components `db`, `gmgn` (`global_paused_sec`, `cooling_groups {group: sec}`, `cooldown_levels {group: {level, step_sec, probing}}`, throttles, global pauses, last ok), `directory` (last refresh), `curation` (curated/manual counts, last run), `watcher` (active wallets, tiers, mode, polls, events, trigger counters), `trigger` (connected, healthy, subscriptions, reconnects, notifications) |
 | `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome incl. `denied`, average latency, req/min), last 24 h from the database (incl. throttled count), `budget` (global + `groups{vas, api, defi, mrwapi}`: limits, tokens, cooling, throttles, request counts in the last 10/60/300 s, peaks, counts before the last throttle, granted/denied per priority), cache, `candidates` job, job summaries (`watcher.trigger`: polls, hits, timeouts, caps, notification→GMGN-index p50/p90, coverage), wallet counts, feed 24 h (events, live events, lag p50/p90 overall and `live_by_source`) |
 | `POST /v1/admin/refresh?curate=false` | run a rank refresh now (optionally the curation too) |
 | `POST /v1/admin/curate` | run the curation now from the latest snapshots |

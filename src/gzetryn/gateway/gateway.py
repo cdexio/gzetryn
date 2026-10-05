@@ -177,15 +177,23 @@ class Gateway:
             self.last_error = f"{endpoint.name}: {v.outcome} {v.code or ''} {v.message or ''}".strip()
             if v.outcome == A.THROTTLED:
                 pause = self._budget.throttle(group)
-                windows = self._budget.report()[group]["last_throttle_windows"]
+                rep = self._budget.report()[group]
+                windows, level = rep["last_throttle_windows"], rep["cooldown_level"]
                 self.last_throttle_at = now
                 log.warning(
                     "gmgn throttled",
                     extra=fields(
-                        endpoint=endpoint.name, group=group, status=raw.status, cooldown_sec=pause, windows=windows
+                        endpoint=endpoint.name,
+                        group=group,
+                        status=raw.status,
+                        cooldown_sec=pause,
+                        cooldown_level=level,
+                        windows=windows,
                     ),
                 )
-                head = json.dumps({"group": group, "cooldown_sec": pause, "requests_in_window_sec": windows})
+                head = json.dumps(
+                    {"group": group, "cooldown_sec": pause, "cooldown_level": level, "requests_in_window_sec": windows}
+                )
                 await self._hooks.sample(endpoint.name, raw.status, v.outcome, head + " " + (raw.text_head or "")[:200])
                 reason, retry_after = f"cooldown:{group}", pause
                 break

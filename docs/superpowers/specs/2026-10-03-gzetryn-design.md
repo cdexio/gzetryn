@@ -420,11 +420,16 @@ throttles into ~7,800 s of total blackout in 49 h.
   ≥ 1.0 s apart (smooths trigger storms); api 30/min, burst 8, 0.3 s; defi
   and mrwapi 20/min, burst 6, 0.3 s. A global bucket keeps the overall cap
   (60/min, burst 15, ≥ 0.25 s).
-- **Per-group cooldown** on a 429/403: 15 s, doubling to 5 min, reset
-  after 15 min clean `[TUNABLE]`. After the cooldown exactly one request
-  probes the group; it reopens when GMGN answers. Other groups keep
-  working. A **global** pause (60 s) happens only when 2+ groups are
-  cooling at the same time.
+- **Per-group cooldown** on a 429/403: 15 s, doubling on every
+  consecutive throttle (= failed probe) up to 1 h (15, 30, 60, 120, 240,
+  480, 960, 1920, 3600 s), reset by the first success `[TUNABLE]`. After
+  each cooldown exactly one request probes the group; it reopens when GMGN
+  answers. (Until 2026-10-05 09:30 UTC the cap was 5 min with a time-based
+  reset: `/vas/` blocks outlast 300 s, so probes hit 429 every 300 s at
+  09:19:42, 09:24:42, 09:29:42 with 1 request in the window.) The level
+  and step are logged with every throttle and shown in `/health`. Other
+  groups keep working. A **global** pause (60 s) happens only when 2+
+  groups are cooling at the same time.
 - **Priorities, strict inside a group**: P0 trigger polls (the real-time
   feed), P1 API calls (engine: token enricher, market, stats), P2 interval
   polls, P3 background (ranks, wallet metrics, candidate lists). A lower

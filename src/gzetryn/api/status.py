@@ -48,10 +48,17 @@ class RuntimeStatus:
         g = rt.gateway
         paused = rt.budget.paused_for()
         cooling = rt.budget.cooling()
+        groups = rt.budget.report()
         gm = {
             "status": "ok",
             "global_paused_sec": round(paused, 1),
             "cooling_groups": cooling,  # {group: seconds left}
+            # consecutive throttles and current cooldown step per group that is not fully open
+            "cooldown_levels": {
+                n: {"level": g["cooldown_level"], "step_sec": g["cooldown_step_sec"], "probing": g["probing"]}
+                for n, g in groups.items()
+                if g["cooldown_level"] or g["probing"]
+            },
             "throttles": rt.budget.throttles,
             "global_pauses": rt.budget.global_pauses,
             "tokens": round(rt.budget.tokens, 2),
@@ -61,8 +68,9 @@ class RuntimeStatus:
         }
         if paused > 0:
             gm.update(status="degraded", reason="several GMGN groups throttled; all paused briefly")
-        elif cooling:
-            gm.update(status="degraded", reason="GMGN group(s) cooling after a 429: " + ",".join(sorted(cooling)))
+        elif cooling or gm["cooldown_levels"]:
+            names = sorted(set(cooling) | set(gm["cooldown_levels"]))
+            gm.update(status="degraded", reason="GMGN group(s) challenged (429), cooling/probing: " + ",".join(names))
         elif up > 600 and (g.last_ok_at is None or (now - g.last_ok_at).total_seconds() > 900):
             gm.update(status="degraded", reason="no ok GMGN answer in 15 min")
         c["gmgn"] = gm

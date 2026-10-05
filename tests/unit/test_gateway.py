@@ -72,11 +72,25 @@ async def test_throttle_cools_one_group_only_then_probe():
     b.ok("vas")
     clock.advance(1)
     assert await b.acquire("P0", 0.0, group="vas")  # reopened
-    # doubling, cap, reset
-    assert [b.throttle("vas") for _ in range(4)] == [30, 60, 60, 60]
-    clock.advance(101)
+    # the success reset the ladder: a new episode starts at 15 s and doubles on each consecutive throttle
+    assert [b.throttle("vas") for _ in range(5)] == [15, 30, 60, 60, 60]
+    assert b.report()["vas"]["cooldown_level"] == 5
+    # a block outlasting the cooldown keeps escalating even after long gaps (no success in between)
+    clock.advance(1000)
+    assert b.throttle("vas") == 60
+    b.ok("vas")
+    assert b.report()["vas"]["cooldown_level"] == 0
     assert b.throttle("vas") == 15
-    assert b.report()["vas"]["throttles"] == 6
+    assert b.report()["vas"]["throttles"] == 8
+
+
+async def test_cooldown_ladder_defaults_reach_one_hour():
+    clock = FakeClock()
+    b = Budget(BudgetTunables(), clock)
+    steps = [b.throttle("vas") for _ in range(10)]
+    assert steps == [15, 30, 60, 120, 240, 480, 960, 1920, 3600, 3600]
+    assert b.paused_for() == 0  # one group cooling never pauses the others
+    assert await b.acquire("P1", 0.0, group="api")
 
 
 async def test_global_pause_only_when_two_groups_cool():
@@ -147,7 +161,8 @@ async def test_throttle_serves_stale_cools_group_only():
     assert not s.cached and clock.monotonic() - t_throttle < 1
     ok = await gw.call(E.RANK_SWAPS, path={"interval": "1h"}, priority="P3")  # waits out 15 s, then probes
     assert not ok.stale and clock.monotonic() - t_throttle >= 15 and gw.budget.report()["defi"]["probing"] is False
-    gw.budget.throttle("defi")  # cooling again for 30 s, longer than P0's 20 s wait limit
+    gw.budget.throttle("defi")  # new episode after the success: 15 s
+    gw.budget.throttle("defi")  # consecutive: 30 s, longer than P0's 20 s wait limit
     with pytest.raises(Unavailable) as e:
         await gw.call(E.RANK_SWAPS, path={"interval": "5m"}, priority="P0")
     assert e.value.reason == "cooldown:defi" and e.value.retry_after_sec > 0

@@ -45,10 +45,11 @@ class BudgetTunables(BaseModel):
     max_wait_sec: dict[str, float] = Field(
         default_factory=lambda: {"P0": 20.0, "P1": 30.0, "P2": 60.0, "P3": 120.0}
     )
-    # per-group cooldown after a 429/403: start, doubling, cap; back to the start after `cooldown_reset_sec` clean
+    # per-group cooldown after a 429/403: start, doubling on every consecutive throttle (failed probe), cap; reset by
+    # the first success. 2026-10-05: /vas/ blocks outlast 300 s (probes at +300 s kept hitting 429) → cap 3600 s
     cooldown_start_sec: float = 15.0
-    cooldown_max_sec: float = 300.0
-    cooldown_reset_sec: float = 900.0
+    cooldown_max_sec: float = 3600.0
+    cooldown_reset_sec: float = 900.0  # a throttle after this much clean time (no open ladder) starts again at 15 s
     # global pause only when this many groups are cooling at the same time
     global_pause_groups: int = 2
     global_pause_sec: float = 60.0
