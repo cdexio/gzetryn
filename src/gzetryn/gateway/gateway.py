@@ -134,6 +134,7 @@ class Gateway:
         priority: str = "P2",
         consumer: str = "gzetryn",
         max_age_sec: float | None = None,
+        max_wait_sec: float | None = None,  # budget wait limit; None = budget.max_wait_sec of the priority
     ) -> Result:
         ttl = self.ttl(endpoint)
         accept = float(ttl if max_age_sec is None else min(max_age_sec, ttl))
@@ -151,7 +152,9 @@ class Gateway:
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._inflight[key] = fut
         try:
-            result = await self._fetch(endpoint, path or {}, params or {}, body, priority, consumer, key, ttl > 0)
+            result = await self._fetch(
+                endpoint, path or {}, params or {}, body, priority, consumer, key, ttl > 0, max_wait_sec
+            )
             fut.set_result(result)
             return result
         except BaseException as e:
@@ -172,13 +175,14 @@ class Gateway:
         consumer: str,
         key: tuple,
         cacheable: bool,
+        max_wait_sec: float | None = None,
     ) -> Result:
         reason, retry_after = "unavailable", 30.0
         group = endpoint.group
         gc = self._cls(endpoint, priority)
         for attempt in range(2):
             try:
-                await self._budget.take(priority, group)
+                await self._budget.take(priority, group, max_wait_sec)
             except Denied as d:
                 self.counts[(consumer, endpoint.name, "denied")] += 1
                 self.class_counts[(*gc, "denied")] += 1

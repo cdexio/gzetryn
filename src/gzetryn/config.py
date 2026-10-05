@@ -219,6 +219,9 @@ class TriggerTunables(BaseModel):
     chain_max_age_sec: float = 120.0  # drop a queued signature older than this (GMGN fallback polling catches it)
     chain_queue_max: int = 200
     sol_usd_window_min: int = 30  # SOL/USD from the median of GMGN trades in the feed over this window
+    # [TUNABLE] symbol/supply/SOL price lookups for a chain event wait at most this long for the /api/ budget, then
+    # the event is stored without them (5 Oct 15:20-15:35 UTC: bursts of ~26 swaps/min waited 10-22 s on /api/)
+    chain_enrich_max_wait_sec: float = 2.0
 
 
 class CandidatesTunables(BaseModel):

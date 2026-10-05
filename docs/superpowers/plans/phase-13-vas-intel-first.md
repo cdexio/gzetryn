@@ -3,8 +3,8 @@
 ## Problem (measured 5 Oct)
 
 - `/vas/` was blocked 40–47 min/h even after the gentler ladder (phase 12). In the open minutes the
-  wallet_activity polls took the group: 13:30–14:45 UTC, wallet_activity had ~1,700 requests/h asked
-  (~95 % denied), pump lists ~80/h asked, engine intel ~3 survivors/h × 4 calls.
+  wallet_activity polls took the group: 13:29–15:07 UTC, wallet_activity asked 1,979 requests/h (93 sent,
+  1,886 denied), pump lists 92/h (0 sent), engine intel 10/h (0 sent).
 - Engine intel (`gmgn_token_intel`, 11:37–16:28 CEST): 17 calls, **0** with `smart_traders` or holder tags;
   12 answered with `cooldown:vas` errors, 5 timed out at the engine's 4 s limit — those were the minutes `/vas/`
   was open: gzetryn got the vas parts from GMGN, but behind the trigger polls (P0 above the API's P1) and the 1 s
@@ -15,7 +15,7 @@
 - The pump lists added nearly nothing: since the pump.fun chain source started (12:29 UTC) it saw 90 of 92
   `migrated` first; the engine ignores `completing` and bonding-curve `new` rows and reads `first` only.
 - The chain decoder itself queued in bursts: one RPC paced at 2 s → bursts of 14 swaps/min waited up to ~60 s
-  (chain lag p50 23.8 s over 13:30–14:45).
+  (chain lag p50 36.4 s, p90 107 s over 13:29–15:07).
 
 ## Decision (with the data above)
 

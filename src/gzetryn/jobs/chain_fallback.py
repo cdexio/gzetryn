@@ -264,7 +264,12 @@ class ChainFallback:
             return value, src
         value, src = None, None
         with contextlib.suppress(GatewayError):
-            r = await self._gw.call(E.TOKEN_WINDOW_INFO, body={"chain": E.CHAIN, "addresses": [WSOL]}, priority="P1")
+            r = await self._gw.call(
+                E.TOKEN_WINDOW_INFO,
+                body={"chain": E.CHAIN, "addresses": [WSOL]},
+                priority="P1",
+                max_wait_sec=self._t.chain_enrich_max_wait_sec,
+            )
             p = parse.token_window_info(r.body)
             if p is not None and p["info"]["mint"] == WSOL and p["price"].get("price_usd"):
                 value, src = float(p["price"]["price_usd"]), "gmgn_wsol"
@@ -299,7 +304,11 @@ class ChainFallback:
         with contextlib.suppress(GatewayError):
             # P1: below engine token intel (P0), above the background lists (D-2026-10-05-14)
             r = await self._gw.call(
-                E.TOKEN_WINDOW_INFO, body={"chain": E.CHAIN, "addresses": [ct.mint]}, priority="P1", consumer="gzetryn"
+                E.TOKEN_WINDOW_INFO,
+                body={"chain": E.CHAIN, "addresses": [ct.mint]},
+                priority="P1",
+                consumer="gzetryn",
+                max_wait_sec=self._t.chain_enrich_max_wait_sec,  # never hold the event for the /api/ budget
             )
             p = parse.token_window_info(r.body)
             if p is not None and p["info"]["mint"] == ct.mint:

@@ -273,7 +273,10 @@ curl_cffi's browser one 200) at 1.0 s `[TUNABLE]`, and mainnet-beta at 2.0 s;
 together ≈ 90 calls/min. RPC calls are serial; enrichment and insert run in
 their own tasks; a transaction the RPC has not indexed yet is retried 2 s
 later without blocking the queue. Chain-event enrichment runs at P1 (below
-engine intel). SOL/USD is GMGN's wSOL price from `mutil_window_token_info`
+engine intel) and waits at most 2 s `[TUNABLE]` for the `/api/` budget, then
+the event is stored without symbol/supply (15:20–15:35 UTC after the first
+deploy, bursts of ~26 swaps/min waited 10–22 s for `/api/` tokens; the RPC
+side had ~3× headroom). SOL/USD is GMGN's wSOL price from `mutil_window_token_info`
 (`/api/`, verified 119.45 on 2026-10-05), else the feed median, also for the
 pump.fun chain candidates.
 
