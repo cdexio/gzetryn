@@ -15,6 +15,17 @@ With "reset the ladder on the first success", `/vas/` was re-challenged 6 times 
 - Both apply per group (all GMGN groups and the launchlab/dextools lines). `/v1/stats` shows `cooldown_level` (after
   decay) and `slow_after_reopen_sec` per group.
 
+## Result (deployed `15a6c3a` 13:29:26 UTC)
+
+| `vas`, 60 min windows | Before 12:29–13:29 | After 13:29–14:30 |
+|---|---|---|
+| Throttles (probes into a block) | 21 | 5 |
+| Re-challenges (new episode after a reopen) | 4/h, each restarting at level 1 | 2.9/h, continuing at levels 6–8 |
+| Blocked minutes | 39.6 min/h | 43.5 min/h |
+
+Fewer requests into blocks (−76 %), but blocked time is set by GMGN's block length, not by our probing; it did not
+drop. The feed stayed real-time through the chain fallback (chain events p50 3.56 s, trigger p50 2.76 s).
+
 ## Measure
 
 Re-challenge count (block episodes that start after a reopen) and blocked minutes per hour for `vas`, from the
