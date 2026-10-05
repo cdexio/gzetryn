@@ -29,6 +29,8 @@ def _default_groups() -> dict[str, GroupTunables]:
         "api": GroupTunables(per_minute=30, burst=8, min_gap_sec=0.3),
         "defi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),
         "mrwapi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),
+        # not GMGN: Raydium LaunchLab list API (120 calls at 5 s + 20 at 0.3 s all 200; ~6/min needed)
+        "launchlab": GroupTunables(per_minute=20, burst=3, min_gap_sec=1.0),
     }
 
 
@@ -203,6 +205,19 @@ class PumpChainTunables(BaseModel):
     migrated: bool = True  # CompletePumpAmmMigrationEvent → kind migrated (pool from the event, verified 2/2)
 
 
+class LaunchLabTunables(BaseModel):
+    """Raydium LaunchLab lists (spec §7.3, phase 10). Rate line `launchlab` in budget.groups."""
+
+    enabled: bool = True
+    url: str = "https://launch-mint-v1.raydium.io/get/list"
+    new_sec: float = 15.0  # [TUNABLE] sort=new (launches appear 13-119 s after creation; polling faster gains little)
+    new_size: int = Field(50, ge=1, le=100)
+    last_trade_sec: float = 30.0  # [TUNABLE] sort=lastTrade → completing
+    last_trade_size: int = Field(100, ge=1, le=100)
+    # [TUNABLE] Raydium's finishingRate percent (100 after migration); lower than token-based progress → 25, not 55
+    completing_min_rate: float = 25.0
+
+
 class TokenTunables(BaseModel):
     traders_limit: int = 50
     dev_recent_tokens: int = 10
@@ -240,6 +255,7 @@ class Tunables(BaseModel):
     trigger: TriggerTunables = Field(default_factory=TriggerTunables)
     candidates: CandidatesTunables = Field(default_factory=CandidatesTunables)
     pump_chain: PumpChainTunables = Field(default_factory=PumpChainTunables)
+    launchlab: LaunchLabTunables = Field(default_factory=LaunchLabTunables)
     token: TokenTunables = Field(default_factory=TokenTunables)
     copy_score: CopyScoreTunables = Field(default_factory=CopyScoreTunables)
     retention: RetentionTunables = Field(default_factory=RetentionTunables)

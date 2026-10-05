@@ -132,6 +132,16 @@ class RuntimeStatus:
                 pcs.update(status="degraded", reason="no pump.fun transactions received")
             c["pump_chain"] = pcs
 
+        if rt.launchlab is None:
+            c["launchlab"] = {"status": "disabled"}
+        else:
+            ll = rt.launchlab.summary()
+            lls = {"status": "ok", **{k: ll[k] for k in ("new", "completing")}}
+            last_ok = max((v["last_ok_at"] or "" for v in (ll["new"], ll["completing"])), default="")
+            if up > 600 and not last_ok:
+                lls.update(status="degraded", reason="no ok LaunchLab list call yet")
+            c["launchlab"] = lls
+
         statuses = [v["status"] for v in c.values()]
         overall = "broken" if "broken" in statuses else "degraded" if "degraded" in statuses else "ok"
         return {
@@ -193,6 +203,7 @@ class RuntimeStatus:
             },
             "candidates": rt.candidates.summary() if rt.candidates is not None else None,
             "pump_chain": rt.pump_chain.summary() if rt.pump_chain is not None else None,
+            "launchlab": rt.launchlab.summary() if rt.launchlab is not None else None,
             "cache": {"entries": len(rt.gateway.cache), "hits": rt.gateway.cache.hits, "misses": rt.gateway.cache.misses},
             "directory": rt.directory.summary(),
             "watcher": rt.watcher.summary(),

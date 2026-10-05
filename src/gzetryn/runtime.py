@@ -14,6 +14,7 @@ from gzetryn.gmgn import endpoints as E
 from gzetryn.jobs.candidates import Candidates
 from gzetryn.jobs.chain_fallback import ChainFallback
 from gzetryn.jobs.directory import Directory
+from gzetryn.jobs.launchlab import LaunchLab
 from gzetryn.jobs.pump_chain import PumpChain
 from gzetryn.trigger.solana import PUMP_PROGRAM
 from gzetryn.jobs.token import TokenIntel
@@ -80,6 +81,9 @@ class Runtime:
             if self.t.candidates.enabled
             else None
         )
+        self.launchlab: LaunchLab | None = (
+            LaunchLab(self.t.launchlab, self.budget, self.candidate_store, self.clock) if self.t.launchlab.enabled else None
+        )
         self._flushed: Counter = Counter()
         self._flushed_lat: defaultdict = defaultdict(float)
         self._tasks: list[asyncio.Task] = []
@@ -120,6 +124,8 @@ class Runtime:
             self._tasks.append(asyncio.create_task(self.candidates.run(), name="candidates"))
         if self.pump_chain is not None and self.t.watch.enabled:
             self._tasks.append(asyncio.create_task(self.pump_chain.run(), name="pump_chain"))
+        if self.launchlab is not None:
+            self._tasks.append(asyncio.create_task(self.launchlab.run(), name="launchlab"))
         self._tasks.append(asyncio.create_task(self._every(60, self._flush_counts), name="counts"))
         self._tasks.append(
             asyncio.create_task(self._every(self.t.retention.interval_sec, self._retention, 900), name="retention")
@@ -159,6 +165,8 @@ class Runtime:
             self.chain.stop()
         if self.candidates is not None:
             self.candidates.stop()
+        if self.launchlab is not None:
+            self.launchlab.stop()
         if self.pump_chain is not None:
             self.pump_chain.stop()
             try:

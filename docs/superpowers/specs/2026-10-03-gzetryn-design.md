@@ -378,6 +378,15 @@ at progress ≥ 0.55 `[TUNABLE]` become `completing` rows (`source chain`, pool 
 most every 30 s `[TUNABLE]`; CompletePumpAmmMigrationEvent becomes a `migrated` row with the PumpSwap pool.
 CreateEvents fill symbol/name. Rows from GMGN and the chain merge per (kind, mint).
 
+### 7.3 Raydium LaunchLab lists (owner decision D-2026-10-05-13)
+
+Facts and design: `../plans/phase-10-launchlab.md`. `launch-mint-v1.raydium.io/get/list` polled on its own rate line
+`launchlab` (20/min, burst 3, gap 1 s, GMGN group cooldown policy): `sort=new&size=50` every 15 s → `new`;
+`sort=lastTrade&size=100` every 30 s → `completing` when 25 ≤ finishingRate < 100 `[TUNABLE]` (Raydium's funds
+scale, 100 at migration). ≈ 6 requests/min. `source launchlab`, platform from `platformInfo.name`. Rows reach the
+list 13–119 s after on-chain creation; a LaunchLab chain reader (0.8 MB per 30 s measured) is the fix if that lag
+matters.
+
 ## 8. Leaderboards and "who to copy"
 
 - `GET /v1/leaderboard?period=30d|7d&tag=kol|smart_degen|all&sort=profit|pnl|winrate&limit=`:

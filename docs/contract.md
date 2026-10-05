@@ -154,14 +154,25 @@ keep `next_cursor` and pass it as `after`. `wait` long-polls. `kind` filters (co
 | `migrated` | pump.fun graduations (`exchange` `pump_amm`, `pool_address` = the AMM pool). Sources: the chain (`source` chain, from pump.fun's `CompletePumpAmmMigrationEvent`: pool, `complete_at`, ~1.7 s after the block), GMGN's pump.fun `completed` list (`source` pump_lists, `complete_at` set). Supplement: new pairs with `pump_amm` + launchpad `pump` + `Pump.fun` (`source` new_pairs, `complete_at` null) — 11 of 12 such rows were confirmed by the completed list and arrived ~279 s earlier, but GMGN's new pairs carry only ~16 % of graduations. The same mint can therefore appear once per kind only, from whichever source saw it first |
 | `trending` | GMGN 1 h swaps rank |
 
-Row: `seq, kind, mint, source (chain|pump_lists|new_pairs|rank_swaps), first_seen_at, last_seen_at, seen_count, symbol,
+**Raydium LaunchLab** (non-pump.fun launchpads: StonkFun, letsbonk.fun, Raydium, …; since 2026-10-05,
+`source launchlab`): `new` from LaunchLab's `sort=new` list (every 15 s) and `completing` from its `sort=lastTrade`
+list when 25 ≤ `finishingRate` < 100 (every 30 s). `launchpad` = `launchlab`, `launchpad_platform` =
+`platformInfo.name`, `exchange` = `ray_launchpad`, `pool_address` = the LaunchLab pool, `quote_address` = the quote
+mint (WSOL, NVDAx, SPCXx, WBTC, ZEC, USD1, …). `progress` = finishingRate / 100 — **Raydium's own scale** (100 at
+migration; lower than a token-based progress such as pump.fun's or GMGN's, e.g. 0.095 vs GMGN 0.185), so do not
+compare it with pump.fun progress. `mcap_usd` = Raydium's marketCap (USD), `price_usd` = mcap / supply,
+`volume_total_usd` = cumulative USD volume since launch; holders, 1 h volume, buys/sells, tags, liquidity null.
+Launches reach LaunchLab's list 13–119 s (p50 79 s) after their on-chain creation.
+
+Row: `seq, kind, mint, source (chain|launchlab|pump_lists|new_pairs|rank_swaps), first_seen_at, last_seen_at, seen_count, symbol,
 name, pool_address, exchange (dex: pump = bonding curve, pump_amm, raydium…, meteora_dlmm…), launchpad (e.g.
 pump), launchpad_platform (e.g. Pump.fun, pump_mayhem), quote_address, creator, created_at (token creation),
 open_at (pool open), complete_at (bonding curve completed; migrated only), first{…}, last{…}`.
 
 `first` (frozen at the first sighting) and `last` (latest sighting) have the same keys: `price_usd, liquidity_usd,
 mcap_usd (GMGN market cap = price × total supply = FDV), holders, volume_1h_usd, buys_1h, sells_1h, swaps_1h,
-smart_degen_count, renowned_count (KOL), sniper_count, top_10_holder_rate, progress (bonding curve 0–1)`. A field
+smart_degen_count, renowned_count (KOL), sniper_count, top_10_holder_rate, progress (bonding curve 0–1),
+volume_total_usd (LaunchLab only)`. A field
 its source does not carry is null. `source chain` rows: `progress` = 1 − real token reserves / 793.1 M (equal to
 the bonding-curve account, and to GMGN's value whenever GMGN is fresh), `price_usd` = virtual SOL / virtual tokens ×
 SOL/USD, `mcap_usd` = price × total supply, `liquidity_usd` = real SOL in the curve × SOL/USD (SOL/USD: median of recent

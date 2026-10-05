@@ -545,6 +545,7 @@ CANDIDATE_METRICS = (
     "sniper_count",
     "top_10_holder_rate",
     "progress",
+    "volume_total_usd",  # cumulative USD volume since launch (LaunchLab rows only)
 )
 
 

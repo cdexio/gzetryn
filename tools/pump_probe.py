@@ -62,6 +62,7 @@ async def main() -> None:
     ap.add_argument("--commitment", default="confirmed")
     ap.add_argument("--ws", default=WS)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--program", default=PUMP, help="program id to follow (volume only for non-pump programs)")
     a = ap.parse_args()
     c = collections.Counter()
     sizes: list[int] = []
@@ -71,7 +72,7 @@ async def main() -> None:
     t0 = time.time()
     async with websockets.connect(a.ws, max_size=2**23, ping_interval=20) as ws:
         await ws.send(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "logsSubscribe",
-                                  "params": [{"mentions": [PUMP]}, {"commitment": a.commitment}]}))
+                                  "params": [{"mentions": [a.program]}, {"commitment": a.commitment}]}))
         while time.time() - t0 < a.seconds:
             try:
                 raw = await asyncio.wait_for(ws.recv(), timeout=max(0.1, a.seconds - (time.time() - t0)))
