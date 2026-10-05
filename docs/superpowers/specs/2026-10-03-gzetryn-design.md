@@ -269,8 +269,10 @@ single public RPC paced at 2 s. The decoder now uses two free RPCs, each
 paced on its own, the soonest free one first: PublicNode
 (`https://solana-rpc.publicnode.com`, verified 2026-10-05: 80/80 calls at
 0.5 s and 60/60 at 1 s, p50 0.27 s; Python's default user agent gets 403,
-curl_cffi's browser one 200) at 1.0 s `[TUNABLE]`, and mainnet-beta at 2.0 s;
-together ≈ 90 calls/min. RPC calls are serial; enrichment and insert run in
+curl_cffi's browser one 200) at 0.5 s `[TUNABLE]` (1.0 s at first; a 58
+swaps/min copy-trade burst at 16:35 UTC then queued up to 73 s; 300/300
+calls at 0.5 s over 160 s were clean), and mainnet-beta at 2.0 s; together
+≈ 150 calls/min. RPC calls are serial; enrichment and insert run in
 their own tasks; a transaction the RPC has not indexed yet is retried 2 s
 later without blocking the queue. Chain-event enrichment runs at P1 (below
 engine intel) and waits at most 2 s `[TUNABLE]` for the `/api/` budget, then

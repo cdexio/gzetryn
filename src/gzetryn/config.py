@@ -206,11 +206,13 @@ class TriggerTunables(BaseModel):
     # the old GMGN trigger poll, chain only while /vas/ is closed.
     chain_first: bool = True
     # free public RPCs for getTransaction, used in turn by the soonest free one, each paced on its own:
-    # mainnet-beta returned 429 after ~16 calls in 8 s (1 per 2.5 s clean); PublicNode 80/80 at 0.5 s and 60/60 at
-    # 1 s, p50 0.27 s (2026-10-05 15:00 UTC). Bursts of 14 swaps/min queued up to ~60 s on mainnet-beta alone.
+    # mainnet-beta returned 429 after ~16 calls in 8 s (1 per 2.5 s clean); PublicNode 80/80 at 0.5 s, 60/60 at
+    # 1 s, p50 0.27 s (2026-10-05 15:00 UTC) and 300/300 at 0.5 s over 160 s next to gzetryn's own calls (17:05).
+    # Bursts: 14 swaps/min queued up to ~60 s on mainnet-beta alone; 58/min (16:35 UTC copy-trade cluster) queued up
+    # to 73 s with PublicNode at 1 s → 0.5 s, ≈ 150 calls/min together. [TUNABLE]
     rpc_endpoints: list[RpcEndpoint] = Field(
         default_factory=lambda: [
-            RpcEndpoint(url="https://solana-rpc.publicnode.com", min_gap_sec=1.0),
+            RpcEndpoint(url="https://solana-rpc.publicnode.com", min_gap_sec=0.5),
             RpcEndpoint(url="https://api.mainnet-beta.solana.com", min_gap_sec=2.0),
         ]
     )

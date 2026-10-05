@@ -31,8 +31,9 @@
    remembered; a sweep that finds them counts them per reason (`watcher.chain_missed_found_by_gmgn`) and marks
    `payload.chain_missed`, to decide later with data whether `not_a_swap` deserves a GMGN poll.
 3. **Pump lists skipped while the pump.fun chain source is healthy** (a pump.fun transaction within 120 s).
-4. **Decoder throughput**: a second free RPC, PublicNode (verified 80/80 at 0.5 s, 60/60 at 1 s, p50 0.27 s),
-   paced at 1 s next to mainnet-beta at 2 s; RPC calls serial, enrichment + insert in tasks, not-indexed
+4. **Decoder throughput**: a second free RPC, PublicNode (verified 80/80 at 0.5 s, 60/60 at 1 s, p50 0.27 s;
+   later 300/300 at 0.5 s over 160 s), paced at 1 s, then 0.5 s after a 58 swaps/min burst queued up to 73 s,
+   next to mainnet-beta at 2 s; chain enrichment waits ≤ 2 s for the `/api/` budget; RPC calls serial, enrichment + insert in tasks, not-indexed
    transactions retried 2 s later without blocking. SOL/USD from GMGN's wSOL price (`/api/`), else the feed
    median (the feed now has few GMGN trades).
 5. `/v1/stats` → `budget.groups.<g>.classes`: requests per class (`intel`, else the endpoint name) since start

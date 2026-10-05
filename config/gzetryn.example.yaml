@@ -92,7 +92,7 @@ trigger:                  # on-chain trigger (spec §6.1); free public endpoint,
   chain_fallback: true      # chain decoder for notified swaps (spec §6.2)
   chain_first: true         # D-2026-10-05-14: every notified swap is decoded from the chain, no GMGN trigger poll
   rpc_endpoints:            # free public RPCs, soonest free one first, each paced on its own
-    - {url: https://solana-rpc.publicnode.com, min_gap_sec: 1.0}   # 80/80 at 0.5 s, 60/60 at 1 s (2026-10-05)
+    - {url: https://solana-rpc.publicnode.com, min_gap_sec: 0.5}   # 300/300 at 0.5 s over 160 s (2026-10-05)
     - {url: https://api.mainnet-beta.solana.com, min_gap_sec: 2.0} # 429 after ~16 calls in 8 s; 1 per 2.5 s clean
   rpc_backoff_sec: 30
   min_gap_sec: 2
