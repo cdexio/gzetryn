@@ -136,6 +136,45 @@ async def test_strict_priority_in_group():
     assert await b.acquire("P1", 0.0, group="vas")
 
 
+async def test_vas_defaults_keep_one_survivors_intel_free():
+    """D-2026-10-05-14: in vas, P2/P3 leave 4 tokens and P0 starts 0.25 s apart, so the 4 vas calls of one survivor
+    start within 0.75 s even right after wallet polls drained what they may take."""
+    clock = FakeClock()
+    b = Budget(BudgetTunables(), clock)
+    assert await b.acquire("P3", 0.0, group="vas")  # full bucket 5 → 4
+    clock.advance(1.0)  # 4.2 tokens
+    assert not await b.acquire("P3", 0.0, group="vas")  # P3 needs 1 + 4 reserve
+    assert not await b.acquire("P2", 0.0, group="vas")  # pump lists too
+    t0 = clock.monotonic()
+    starts = []
+    for _ in range(4):
+        assert await b.acquire("P0", 1.0, group="vas")
+        starts.append(clock.monotonic() - t0)
+    assert starts[-1] <= 0.8
+    # a cooling group answers P0 at once (3 s wait limit < cooldown): the caller gets "unavailable" fast
+    b.throttle("vas")
+    t1 = clock.monotonic()
+    assert not await b.acquire("P0", group="vas")
+    assert clock.monotonic() - t1 < 0.01
+
+
+async def test_p0_global_gap_and_class_counts():
+    gw, tr, clock = make()
+    t0 = clock.monotonic()
+    # one survivor's calls go to four groups: only the global gap separates them (0.05 s for P0, 0.25 s otherwise)
+    await gw.call(E.TOKEN_SECURITY, path={"mint": "M"}, priority="P0")
+    await gw.call(E.TOKEN_MULTI_INFO, body={"chain": "sol", "addresses": ["M"]}, priority="P0")
+    await gw.call(E.TOKEN_HOLDER_STAT, path={"mint": "M"}, priority="P0")
+    await gw.call(E.RANK_SWAPS, path={"interval": "1h"}, priority="P0")
+    assert clock.monotonic() - t0 < 0.3
+    await gw.call(E.WALLET_ACTIVITY, params={"wallet": "W"}, priority="P3")
+    await gw.call(E.TOKEN_SECURITY, path={"mint": "M"}, priority="P0")  # cached
+    rep = gw.class_report()
+    assert rep["api"]["intel"] == {"sent": 1, "ok": 1, "throttled": 0, "denied": 0, "cache": 1, "sent_last_hour": 1}
+    assert rep["vas"]["intel"]["sent"] == 1
+    assert rep["vas"]["wallet_activity"]["sent"] == 1 and rep["vas"]["wallet_activity"]["sent_last_hour"] == 1
+
+
 async def test_windows_recorded_at_throttle():
     clock = FakeClock()
     b = group_budget(clock)
@@ -184,7 +223,7 @@ async def test_throttle_serves_stale_cools_group_only():
     ok = await gw.call(E.RANK_SWAPS, path={"interval": "1h"}, priority="P3")  # waits out 15 s, then probes
     assert not ok.stale and clock.monotonic() - t_throttle >= 15 and gw.budget.report()["defi"]["probing"] is False
     gw.budget.throttle("defi")  # re-challenge right after the reopen: the ladder continues (30 s)
-    gw.budget.throttle("defi")  # 60 s, longer than P0's 20 s wait limit
+    gw.budget.throttle("defi")  # 60 s, longer than P0's 3 s wait limit
     with pytest.raises(Unavailable) as e:
         await gw.call(E.RANK_SWAPS, path={"interval": "5m"}, priority="P0")
     assert e.value.reason == "cooldown:defi" and e.value.retry_after_sec > 0

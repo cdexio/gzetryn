@@ -18,9 +18,14 @@ def tier(last_trade_at: datetime | None, now: datetime, t: WatchTunables) -> str
     return "cold"
 
 
-def interval(last_trade_at: datetime | None, now: datetime, t: WatchTunables, fallback: bool = False) -> float:
-    """Polling interval by tier; `fallback` = the on-chain trigger is healthy, so interval polls only catch misses."""
+def interval(
+    last_trade_at: datetime | None, now: datetime, t: WatchTunables, fallback: bool = False, sweep: bool = False
+) -> float:
+    """Polling interval by tier; `fallback` = the on-chain trigger is healthy, so interval polls only catch misses;
+    `sweep` = notified swaps go to the chain decoder (D-2026-10-05-14), GMGN only sweeps for what it cannot see."""
     k = tier(last_trade_at, now, t)
+    if sweep:
+        return {"hot": t.sweep_hot_interval_sec, "warm": t.sweep_warm_interval_sec}.get(k, t.sweep_cold_interval_sec)
     if fallback:
         return {"hot": t.fallback_hot_interval_sec, "warm": t.fallback_warm_interval_sec}.get(
             k, t.fallback_cold_interval_sec

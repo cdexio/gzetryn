@@ -97,6 +97,7 @@ async def test_triggered_poll_resolves_signature(client):
     await rt.watcher.reload()
     assert rt.trigger is not None and rt.trigger.summary()["wallets"] == 1
     sig = "45G5viAvp2PdN7wELCBoJryThidWK6t1qSsRC5PpguzXBiqVoSF19zwo8CQbss4WJQRdDy63b3kiZ8iuUSJ33wjP"  # in fixture
+    rt.t.trigger.chain_first = False  # legacy mode: a notification → GMGN trigger poll
     rt.watcher.on_trade(WALLET, sig, 1)
     rt.watcher.on_trade(WALLET, "not-indexed-yet", 1)
     await rt.watcher.poll(WALLET, "trigger")
@@ -146,10 +147,12 @@ async def test_token_snipers_part_opt_in(client):
 
 async def test_token_holders_partial_while_vas_cools(client):
     rt = client.rt
-    rt.budget.throttle("vas")  # vas cools 15 s
-    rt.t.budget.max_wait_sec["P1"] = 0.5  # the API call must not wait it out in this test
+    rt.budget.throttle("vas")  # vas cools 15 s: longer than P0's 3 s wait limit → those parts fail at once
+    t0 = rt.clock.monotonic()
     r = await client.get(f"/v1/token/{MINT}", headers=H, params={"parts": "holders,security", "max_age_sec": 0})
     assert r.status_code == 200, r.text
+    assert rt.clock.monotonic() - t0 < 2.0  # never waits for the cooldown (engine timeout 4 s)
+    assert rt.gateway.class_report()["vas"]["intel"]["denied"] == 2
     d = r.json()["data"]
     assert d["holders"]["rates"]["holder_count"] == 1263  # token_stat is /api/: still served
     assert d["holders"]["holder_counts_by_tag"] is None and d["errors"]["holders"].startswith("partial:")
@@ -169,24 +172,22 @@ async def test_chain_fallback_event_then_gmgn_duplicate_skipped(client):
     # the fixture trade is older than this test's activation → pretend the wallet was active before it
     rt.watcher._ctx[g["wallet"]].watch_started_at = datetime(2026, 1, 1, tzinfo=UTC)
 
-    async def fake_get_tx(sig):
-        return res
-
-    rt.chain._get_tx = fake_get_tx
-    # routing: with the vas group cooling, a notification goes to the chain fallback
-    rt.budget.throttle("vas")
-    assert not rt.budget.is_open("vas")
+    # routing (chain first, D-2026-10-05-14): with /vas/ open, a notification still goes to the chain decoder
+    assert rt.budget.is_open("vas")
     rt.watcher.on_trade(g["wallet"], g["tx_hash"], 1)
     assert rt.watcher.stats.chain_routed == 1 and rt.chain.summary()["queue"] == 1
+    assert rt.watcher.stats.trigger_polls == 0 and not rt.watcher._trig_due
     rt.chain.enqueue(g["wallet"], g["tx_hash"], "x")  # re-routed by a failed retry: not queued twice
     assert rt.chain.summary()["queue"] == 1 and rt.chain.summary()["skipped_known"] == 1
-    await rt.chain._process(Job(g["wallet"], g["tx_hash"], rt.clock.monotonic(), rt.clock.now().isoformat()))
+    await rt.chain._process(Job(g["wallet"], g["tx_hash"], rt.clock.monotonic(), rt.clock.now().isoformat()), res, "t")
     s = rt.chain.summary()
     assert s["decoded"] == 1 and s["events"] == 1
     r = await client.get("/v1/feed", headers=H, params={"after": 0})
     ev = r.json()["data"]
     assert len(ev) == 1 and ev[0]["payload"]["source"] == "chain" and ev[0]["side"] == g["side"]
     assert ev[0]["tx_hash"] == g["tx_hash"] and ev[0]["sol_amount"] > 0
+    # SOL/USD from GMGN's wSOL price when available (fixture answers the PUDU token instead → feed median / none)
+    assert ev[0]["payload"]["sol_usd_source"] in ("gmgn_wsol", "feed_median", None)
     # GMGN's row for the same trade (rounded amount) arrives later: not a second event
     ctx = rt.watcher.context_of(g["wallet"])
     gm = TradeRow(

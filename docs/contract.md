@@ -18,10 +18,12 @@ For the ZetrynAI engine (and the dashboard). Base URL on the VPS: `http://127.0.
 | 502 `upstream` | GMGN answered something unusable (changed endpoint) |
 | 503 `unavailable` + `Retry-After` | `message` = `cooldown:<group>` (GMGN's Cloudflare challenged that path group, e.g. `cooldown:vas`; it cools 15 s, doubling on every throttle up to 1 h; after it reopens the cooldown steps down one level per 15 clean minutes and the group runs at half rate for 10 minutes; other groups keep working), `budget` (no slot within the wait limit) or `throttled` (2+ groups cooling: global 60 s pause). Cached data is served with `meta.stale = true` instead when there is any |
 
-GMGN path groups (each with its own rate limit and cooldown): `vas` = wallet trades (feed), token holder/trader
-stats, smart traders, pump.fun lists; `api` = token info/stat/security/dev/dev history, new pairs; `defi` = wallet
-ranks, trending, wallet stats; `mrwapi` = launchpad info. Priority inside a group: trigger polls (feed) > API calls
-(you) > interval polls > background jobs.
+GMGN path groups (each with its own rate limit and cooldown): `vas` = token holder/trader stats, smart traders,
+pump.fun lists, wallet trades (sweep); `api` = token info/stat/security/dev/dev history, new pairs; `defi` = wallet
+ranks, trending, wallet stats; `mrwapi` = launchpad info. Priority inside a group (since 2026-10-05,
+D-2026-10-05-14): `/v1/token` intel (P0) > other API calls and chain-event enrichment (P1) > pump.fun lists (P2) >
+wallet_activity sweep and background jobs (P3). In `vas`, P2/P3 leave 4 tokens free, so one token's intel never
+queues behind them.
 
 Addresses (wallets and mints) are base58, 32–44 chars. Times are ISO 8601 UTC. Money: `*_usd` in USD,
 `*_sol` in SOL. Rates are fractions (0.5 = 50 %).
@@ -82,22 +84,24 @@ Semantics:
 - **Lag**: `lag_sec = seen_at − trade_at`, where `trade_at` is GMGN's block time in **whole seconds** (so `lag_sec`
   overstates the true delay by 0–1 s) and `seen_at` is when gzetryn fetched the trade; the event is in the feed a
   few milliseconds later. A long-poll `/v1/feed?wait=25` returns it in the same second.
-- How trades are found: an on-chain trigger (free Solana WebSocket, `logsSubscribe` per active wallet) sees the
-  wallet's transaction ~1–2 s after the block and gzetryn polls GMGN for that wallet right away (retries at +3 and
-  +7 s until GMGN has indexed it, ≤ 10 s). Measured 2026-10-03 → 05 over 1,518 trigger events: `lag_sec` p50
-  2.64 s, p90 3.41 s. While GMGN challenges the `vas` group (`/health` → `components.gmgn.cooling_groups`), new
-  trades wait for the cooldown to end. If the
-  trigger is down or missed a transaction, interval polling catches the trade (every 120/300/900 s by recency while
-  the trigger is healthy, 45/90/300 s while it is down), with a larger `lag_sec`. `payload.source` says which path
-  found the event (`trigger` | `interval` | `chain`); `payload.notified` (`swap` | `filtered`) and `payload.notified_at` are
-  set when the WebSocket saw the transaction. `/health` → `components.trigger` shows whether the fast path is up. A wallet's `watch.last_poll_ok_at` shows gaps; trades during a gap
-  arrive late (larger `lag_sec`), never twice.
-- **`source = chain`** (since 2026-10-05): while GMGN challenges the `vas` group, the trade is decoded from the
-  Solana transaction instead, so the feed stays real-time. Differences from a GMGN event: `sol_amount` is what the
-  wallet actually paid/received (DEX fees and tips included, 0.4–2.2 % off GMGN's figure); `usd_amount`,
-  `price_usd`, `mcap_usd` use a SOL/USD estimate from recent GMGN trades (`payload.sol_usd`); `open_or_close`,
-  `launchpad`, `launchpad_platform` are null; `symbol`/`total_supply` come from GMGN token info and can be null.
-  Only single-token ↔ SOL swaps are decoded; other shapes wait for GMGN.
+- How trades are found (since 2026-10-05, D-2026-10-05-14): an on-chain trigger (free Solana WebSocket,
+  `logsSubscribe` per active wallet) sees the wallet's transaction ~1–2 s after the block and gzetryn decodes it
+  from the transaction itself (`source = chain`, below) — whether or not GMGN's `vas` group is open; no GMGN call.
+  GMGN `wallet_activity` only **sweeps** each wallet every 900/1800/3600 s by recency (45/90/300 s while the
+  WebSocket is down) for trades the chain path cannot see (not notified, not classified as a swap, not a single
+  token ↔ SOL swap, transaction not fetched); those arrive with a larger `lag_sec` and `payload.source = interval`
+  (`payload.chain_missed` = why the decoder did not store it, when it saw the signature). Until 2026-10-05 a
+  notification triggered a GMGN poll instead (`source = trigger`, `lag_sec` p50 2.64 s / p90 3.41 s over 1,518
+  events). `payload.notified` (`swap` | `filtered`) and `payload.notified_at` are set when the WebSocket saw the
+  transaction. `/health` → `components.trigger` shows whether the fast path is up. Trades during a gap arrive late
+  (larger `lag_sec`), never twice.
+- **`source = chain`**: the trade is decoded from the Solana transaction (`getTransaction` on free public RPCs,
+  `payload.rpc`). Differences from a GMGN event: `sol_amount` is what the wallet actually paid/received (DEX fees
+  and tips included, 0.4–2.2 % off GMGN's figure); `usd_amount`, `price_usd`, `mcap_usd` use SOL/USD
+  `payload.sol_usd` from GMGN's wSOL price (`payload.sol_usd_source = gmgn_wsol`), else the median of recent GMGN
+  trades (`feed_median`); `open_or_close`, `launchpad`, `launchpad_platform` are null; `symbol`/`total_supply`
+  come from GMGN token info and can be null. Only single-token ↔ SOL swaps are decoded; other shapes are left to
+  the GMGN sweep.
 - Identity: `(wallet, tx_hash, mint, side)` — a trade is one event whichever path found it first (when `vas`
   reopens, GMGN's row for a chain-decoded trade is not added again).
 
@@ -111,9 +115,11 @@ Default: all parts (≤ 10 GMGN calls on a cold cache). A part that fails is `nu
 **Enricher use (engine)**: `parts=security,launchpad,dev,dev_history,holders,smart_traders` = 9 GMGN calls on a
 cold token, 0 when cached. Cache per part: launchpad 60 s, security 600 s, dev 300 s, dev_history 1800 s, holders
 120 s, smart_traders 120 s (info 30 s), so repeated calls within those windows are free (`meta.cached = true`).
-Runs at API priority, below the real-time feed. For ~200–300 tokens/day expect ≈ 1.6–1.9 extra GMGN req/min.
-A cold call takes ~2–5 s (calls are paced per group); a `cooldown:<group>` error on a part means that part's group
-is cooling — retry after `Retry-After`. `holders` tag counts and `smart_traders` come from the `vas` group: while
+Runs at the top priority of every group (P0, since 2026-10-05, D-2026-10-05-14), ahead of the feed sweep and the
+lists; its 4 `vas` calls start 0.25 s apart. For ~200–300 tokens/day expect ≈ 1.6–1.9 extra GMGN req/min.
+A cold call takes ~1–3 s; a part whose call cannot start within 3 s (its group cooling or being probed) fails at
+once with `unavailable: cooldown:<group>` instead of waiting, so the answer fits a 4 s client timeout — retry
+after `Retry-After`. `holders` tag counts and `smart_traders` come from the `vas` group: while
 it is challenged, `smart_traders` is null and `holders` returns its `rates` (from `api`) with
 `holder_counts_by_tag`/`trader_counts_by_tag` null and `errors.holders = "partial: …"`. For pump.fun candidates the
 `smart_degen_count` / `renowned_count` / `sniper_count` in `/v1/market/candidates` rows are an alternative.
@@ -155,13 +161,15 @@ for 32/40; meaning unverified). Cached 1 h; own rate line `dextools` (20/min, �
 `GET /v1/market/candidates?kind=new,completing,migrated,trending&after=<seq>&limit=500&wait=<0..30>`
 
 Served from gzetryn's database (no GMGN call per request). A background job polls GMGN every 30 s (pump.fun lists,
-new pairs) and 60 s (trending 1h). Each (kind, mint) appears **once**, with a `seq` assigned at its first sighting;
+new pairs) and 60 s (trending 1h). Since 2026-10-05 (D-2026-10-05-14) the pump.fun lists are skipped while the
+pump.fun chain source is delivering (a pump.fun transaction within 120 s): pump.fun `new` (bonding curve) rows then
+stop, `completing` and `migrated` come from the chain. Each (kind, mint) appears **once**, with a `seq` assigned at its first sighting;
 keep `next_cursor` and pass it as `after`. `wait` long-polls. `kind` filters (comma list; default all).
 
 | Kind | Source |
 |---|---|
-| `new` | new pump.fun tokens on the bonding curve (`source` pump_lists), and new pools from GMGN's new pairs (`source` new_pairs: any dex; direct PumpSwap launches `launchpad_platform` pool_pump_amm, meteora, pump_mayhem included) |
-| `completing` | pump.fun tokens on the bonding curve at `progress` ≥ 0.55. Main source since 2026-10-05: the chain (`source` chain — every trade of the pump.fun program, decoded from the logs; standard `Pump.fun` curves only, `pump_mayhem` excluded), plus GMGN's pump.fun list when GMGN's `vas` group is open (`source` pump_lists) |
+| `new` | new pump.fun tokens on the bonding curve (`source` pump_lists, only while the chain source is idle), and new pools from GMGN's new pairs (`source` new_pairs: any dex; direct PumpSwap launches `launchpad_platform` pool_pump_amm, meteora, pump_mayhem included) |
+| `completing` | pump.fun tokens on the bonding curve at `progress` ≥ 0.55. Main source since 2026-10-05: the chain (`source` chain — every trade of the pump.fun program, decoded from the logs; standard `Pump.fun` curves only, `pump_mayhem` excluded), plus GMGN's pump.fun list while the chain source is idle and GMGN's `vas` group is open (`source` pump_lists) |
 | `migrated` | pump.fun graduations (`exchange` `pump_amm`, `pool_address` = the AMM pool). Sources: the chain (`source` chain, from pump.fun's `CompletePumpAmmMigrationEvent`: pool, `complete_at`, ~1.7 s after the block), GMGN's pump.fun `completed` list (`source` pump_lists, `complete_at` set). Supplement: new pairs with `pump_amm` + launchpad `pump` + `Pump.fun` (`source` new_pairs, `complete_at` null) — 11 of 12 such rows were confirmed by the completed list and arrived ~279 s earlier, but GMGN's new pairs carry only ~16 % of graduations. The same mint can therefore appear once per kind only, from whichever source saw it first |
 | `trending` | GMGN 1 h swaps rank |
 
@@ -186,8 +194,8 @@ smart_degen_count, renowned_count (KOL), sniper_count, top_10_holder_rate, progr
 volume_total_usd (LaunchLab only)`. A field
 its source does not carry is null. `source chain` rows: `progress` = 1 − real token reserves / 793.1 M (equal to
 the bonding-curve account, and to GMGN's value whenever GMGN is fresh), `price_usd` = virtual SOL / virtual tokens ×
-SOL/USD, `mcap_usd` = price × total supply, `liquidity_usd` = real SOL in the curve × SOL/USD (SOL/USD: median of recent
-GMGN trades in the feed); `pool_address` = the bonding curve (PDA `["bonding-curve", mint]`); holders, volume,
+SOL/USD, `mcap_usd` = price × total supply, `liquidity_usd` = real SOL in the curve × SOL/USD (SOL/USD: GMGN's wSOL price since 2026-10-05, else the median
+of recent GMGN trades in the feed); `pool_address` = the bonding curve (PDA `["bonding-curve", mint]`); holders, volume,
 buy/sell/swap counts and tag counts null; symbol/name/created_at only when gzetryn saw the token's creation; `last` is
 refreshed at most every 30 s per mint. One row per (kind, mint): whichever source sees a mint first owns `source` and
 `seq`; later rows from the other source merge into `last` (null fields never erase values). pump.fun (GMGN) rows have no `price_usd`; new-pair rows have no buy/sell/swap counts,
@@ -214,6 +222,6 @@ For browsing; the engine should use `/v1/market/candidates`. Verified fields 202
 | Endpoint | Returns |
 |---|---|
 | `GET /health` | `status ok\|degraded\|broken`, `revision`, components `db`, `gmgn` (`global_paused_sec`, `cooling_groups {group: sec}`, `cooldown_levels {group: {level, step_sec, probing}}`, throttles, global pauses, last ok), `directory` (last refresh), `curation` (curated/manual counts, last run), `watcher` (active wallets, tiers, mode, polls, events, trigger counters), `trigger` (connected, healthy, subscriptions, reconnects, notifications) |
-| `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome incl. `denied`, average latency, req/min), last 24 h from the database (incl. throttled count), `budget` (global + `groups{vas, api, defi, mrwapi}`: limits, tokens, cooling, throttles, request counts in the last 10/60/300 s, peaks, counts before the last throttle, granted/denied per priority), cache, `candidates` job, `pump_chain` (trades decoded, rows written, freshness block → row p50/p90), job summaries (`watcher.trigger`: polls, hits, timeouts, caps, notification→GMGN-index p50/p90, coverage), wallet counts, feed 24 h (events, live events, lag p50/p90 overall and `live_by_source`) |
+| `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome incl. `denied`, average latency, req/min), last 24 h from the database (incl. throttled count), `budget` (global + `groups{vas, api, defi, mrwapi}`: limits, tokens, cooling, throttles, request counts in the last 10/60/300 s, peaks, counts before the last throttle, granted/denied per priority, and `classes{intel \| <endpoint>: {sent, ok, throttled, denied, cache, sent_last_hour}}` — requests per class since start, `intel` = `/v1/token` calls), cache, `candidates` job, `pump_chain` (trades decoded, rows written, freshness block → row p50/p90), job summaries (`watcher.trigger`: polls, hits, timeouts, caps, notification→GMGN-index p50/p90, coverage), wallet counts, feed 24 h (events, live events, lag p50/p90 overall and `live_by_source`) |
 | `POST /v1/admin/refresh?curate=false` | run a rank refresh now (optionally the curation too) |
 | `POST /v1/admin/curate` | run the curation now from the latest snapshots |

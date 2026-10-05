@@ -8,8 +8,10 @@ challenged for ~7 min while `/api/` and `/defi/` answered 200. So:
   request (a probe) goes through; the group reopens only when it succeeds.
 - a **global** pause (60 s) happens only when 2+ groups are cooling at the same time.
 - a global token bucket keeps the overall cap.
-- **strict priority** inside a group: P0 (trigger polls) > P1 (API) > P2 (interval polls) > P3 (background); a
-  lower priority never takes a token while a higher one waits in the same group.
+- **strict priority** inside a group (D-2026-10-05-14): P0 (engine token intel) > P1 (other API, chain-event
+  enrichment) > P2 (pump lists) > P3 (wallet_activity sweep, background); a lower priority never takes a token while
+  a higher one waits in the same group, and a group may keep tokens in reserve for the higher ones (`vas`: P2/P3
+  leave 4, one survivor's intel). P0 may use shorter gaps (`p0_min_gap_sec`, `p0_global_gap_sec`).
 - sliding windows of request starts per group are kept, so the rate GMGN tolerates can be measured (peak count in
   any 10 s / 60 s window, and the counts just before each throttle).
 """
@@ -183,7 +185,8 @@ class Budget:
         g = self._group(group)
         limit = self._t.max_wait_sec.get(priority, 60.0) if max_wait_sec is None else max_wait_sec
         deadline = self._clock.monotonic() + limit
-        need = 1.0 + self._t.reserve.get(priority, 0.0)
+        reserve = g.t.reserve if g.t.reserve is not None else self._t.reserve
+        need = 1.0 + reserve.get(priority, 0.0)
         g.waiting[priority] += 1
         try:
             while True:
@@ -211,11 +214,12 @@ class Budget:
                     continue
                 if not self._higher_waiting(g, priority) and self._start(g, priority, now, need):
                     return
+                gap, global_gap = self._gaps(g, priority, now)
                 wait = max(
                     (need - g.bucket.tokens) / g.bucket.rate,
                     (1.0 - self._global.tokens) / self._global.rate,
-                    g.last_start + g.t.min_gap_sec / self._rate_factor(g, now) - now,
-                    self._global_last + self._t.min_gap_sec - now,
+                    g.last_start + gap - now,
+                    self._global_last + global_gap - now,
                     0.02,
                 )
                 if now + wait > deadline:
@@ -228,8 +232,8 @@ class Budget:
     def _start(self, g: GroupState, priority: str, now: float, need: float, probe: bool = False) -> bool:
         if g.bucket.tokens < need or self._global.tokens < 1.0:
             return False
-        gap = g.t.min_gap_sec / self._rate_factor(g, now)  # after a reopen: half rate also stretches the gap
-        if now < g.last_start + gap or now < self._global_last + self._t.min_gap_sec:
+        gap, global_gap = self._gaps(g, priority, now)
+        if now < g.last_start + gap or now < self._global_last + global_gap:
             return False
         g.bucket.tokens -= 1.0
         self._global.tokens -= 1.0
@@ -264,6 +268,17 @@ class Budget:
         g.level = max(0, g.level - k)
         g.step = 0.0 if g.level == 0 else max(self._t.cooldown_start_sec, g.step / (2**k))
         g.last_decay = clean_since + k * self._t.cooldown_decay_sec
+
+    def _gaps(self, g: GroupState, priority: str, now: float) -> tuple[float, float]:
+        """(group gap, global gap) before a start of `priority`. P0 (engine token intel) may use shorter gaps, so one
+        survivor's calls fit the engine's timeout; after a reopen the half rate also stretches the group gap."""
+        base = g.t.min_gap_sec
+        global_gap = self._t.min_gap_sec
+        if priority == "P0":
+            if g.t.p0_min_gap_sec is not None:
+                base = g.t.p0_min_gap_sec
+            global_gap = min(global_gap, self._t.p0_global_gap_sec)
+        return base / self._rate_factor(g, now), global_gap
 
     def _rate_factor(self, g: GroupState, now: float) -> float:
         return self._t.reopen_rate_factor if now - g.reopened_at < self._t.reopen_slow_sec else 1.0

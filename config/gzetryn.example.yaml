@@ -6,15 +6,18 @@ budget:                   # spec §10 (revised 2026-10-05): per path group, stri
   burst: 15
   min_gap_sec: 0.25
   groups:                 # Cloudflare challenges per path prefix (/vas/ blocked while /api/, /defi/ answered)
-    vas: {per_minute: 12, burst: 3, min_gap_sec: 1.0}  # need ≈ 7.5/min; 13-15 req/60 s after a reopen → re-challenged
+    # D-2026-10-05-14: intel first — P2/P3 leave 4 tokens (one survivor's 4 vas calls), P0 starts 0.25 s apart
+    vas: {per_minute: 12, burst: 5, min_gap_sec: 1.0, p0_min_gap_sec: 0.25, reserve: {P0: 0, P1: 0, P2: 4, P3: 4}}
     api: {per_minute: 30, burst: 8, min_gap_sec: 0.3}
     defi: {per_minute: 20, burst: 6, min_gap_sec: 0.3}
     mrwapi: {per_minute: 20, burst: 6, min_gap_sec: 0.3}
     launchlab: {per_minute: 20, burst: 3, min_gap_sec: 1.0}  # not GMGN: Raydium LaunchLab list API
     dextools: {per_minute: 20, burst: 3, min_gap_sec: 2.0}   # not GMGN: DEXTools pair page (snipers part)
-  # P0 trigger polls, P1 API (engine), P2 interval polls, P3 background; tokens each leaves free in its group
+  # P0 engine token intel, P1 other API + chain enrichment, P2 pump lists, P3 wallet sweep + background;
+  # tokens each leaves free in its group (a group's own `reserve` replaces this)
   reserve: {P0: 0, P1: 0, P2: 1, P3: 2}
-  max_wait_sec: {P0: 20, P1: 30, P2: 60, P3: 120}
+  max_wait_sec: {P0: 3, P1: 30, P2: 60, P3: 120}  # P0 3 s: the engine aborts intel after 4 s
+  p0_global_gap_sec: 0.05
   cooldown_start_sec: 15  # per group after a 429/403; doubles on every consecutive throttle; one probe afterwards
   cooldown_max_sec: 3600  # /vas/ blocks outlast 300 s; reset by the first success
   cooldown_decay_sec: 900 # after a success: ladder steps down one level per 15 clean min (no reset)
@@ -38,6 +41,8 @@ launchlab:                # Raydium LaunchLab lists (spec §7.3); rate line budg
 
 candidates:               # engine candidate source (spec §7.1)
   pump_sec: 30
+  pump_skip_when_chain_healthy: true  # D-2026-10-05-14: no /vas/ pump lists while the pump.fun chain source delivers
+  pump_chain_max_idle_sec: 120
   new_pairs_sec: 30
   trending_sec: 60
   retention_days: 7
@@ -70,6 +75,11 @@ watch:
   fallback_hot_interval_sec: 120  # while the trigger is healthy (it only catches misses)
   fallback_warm_interval_sec: 300
   fallback_cold_interval_sec: 900
+  sweep_hot_interval_sec: 900     # chain first (trigger.chain_first): GMGN only sweeps for what the chain misses
+  sweep_warm_interval_sec: 1800
+  sweep_cold_interval_sec: 3600
+  sweep_first_spread_sec: 900
+  miss_poll_sec: 60               # a notified swap the decoder could not fetch → sweep that wallet this soon
 
 trigger:                  # on-chain trigger (spec §6.1); free public endpoint, verified 2026-10-03
   enabled: true
@@ -79,9 +89,11 @@ trigger:                  # on-chain trigger (spec §6.1); free public endpoint,
   retry_delays_sec: [2, 4]  # polls at +1, +3, +7 s (95.4% of trigger events lag <= 5 s)
   max_wait_sec: 10
   max_concurrent: 2         # triggered polls in flight (separate from interval polls)
-  chain_fallback: true      # decode trades from the chain while GMGN's /vas/ group is challenged (spec §6.2)
-  rpc_url: https://api.mainnet-beta.solana.com
-  rpc_min_gap_sec: 2        # public RPC: 429 after ~16 getTransaction in 8 s; 1 per 2.5 s ran clean
+  chain_fallback: true      # chain decoder for notified swaps (spec §6.2)
+  chain_first: true         # D-2026-10-05-14: every notified swap is decoded from the chain, no GMGN trigger poll
+  rpc_endpoints:            # free public RPCs, soonest free one first, each paced on its own
+    - {url: https://solana-rpc.publicnode.com, min_gap_sec: 1.0}   # 80/80 at 0.5 s, 60/60 at 1 s (2026-10-05)
+    - {url: https://api.mainnet-beta.solana.com, min_gap_sec: 2.0} # 429 after ~16 calls in 8 s; 1 per 2.5 s clean
   rpc_backoff_sec: 30
   min_gap_sec: 2
   max_polls_per_min: 10   # per wallet

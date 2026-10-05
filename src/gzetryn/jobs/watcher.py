@@ -1,10 +1,12 @@
-"""Watcher (spec §6): GMGN wallet_activity pages → ordered feed.
+"""Watcher (spec §6): on-chain notifications + GMGN wallet_activity pages → ordered feed.
 
-Two ways a wallet gets polled:
-- **trigger** (spec §6.1): the on-chain WebSocket saw a swap-like transaction of the wallet → poll ~1 s later,
-  retry at +2/4/8/16 s until GMGN has indexed that signature (≤ 30 s). Per wallet ≥ 2 s apart, ≤ 10 per minute.
-- **interval**: adaptive round-robin by the wallet's last trade (hot/warm/cold). While the trigger is healthy the
-  slower fallback intervals apply; when it is down, the normal intervals.
+- **chain first** (D-2026-10-05-14, `trigger.chain_first`): every swap-like notification of the on-chain
+  WebSocket goes to the chain decoder (spec §6.2), which stores the event; no GMGN poll for it.
+- **trigger** (legacy, `chain_first: false`, spec §6.1): notification → GMGN poll ~1 s later, retries at +3/+7 s.
+- **interval**: adaptive round-robin by the wallet's last trade (hot/warm/cold). In chain-first mode with a healthy
+  trigger it is a slow **sweep** (900/1800/3600 s) for trades the chain path cannot see; with the legacy trigger
+  the fallback intervals; when the trigger is down, the normal intervals. A notification the decoder could not
+  fetch pulls that wallet's sweep forward. All wallet polls run at P3, below engine token intel and pump lists.
 """
 
 from __future__ import annotations
@@ -61,7 +63,10 @@ class WatchStats:
     cov_filtered: int = 0  # notified but classified not swap-like → found later by an interval poll
     cov_not_notified: int = 0
     cov_trigger_down: int = 0
-    chain_routed: int = 0  # notified signatures handed to the chain fallback
+    chain_routed: int = 0  # notified signatures handed to the chain decoder
+    miss_polls: int = 0  # sweeps pulled forward by a notification the decoder could not fetch
+    # live trades GMGN delivered whose signature the chain decoder had (reason: not_a_swap, fetch_failed, dropped_*)
+    chain_missed_found: Counter = field(default_factory=Counter)
 
 
 class Watcher:
@@ -111,6 +116,25 @@ class Watcher:
     def _fallback(self) -> bool:
         return self.trigger is not None and self.trigger.healthy
 
+    @property
+    def chain_first(self) -> bool:
+        return self.chain is not None and self._tt.chain_first
+
+    def _interval(self, last_trade_at: datetime | None, now: datetime) -> float:
+        fb = self._fallback
+        return W.interval(last_trade_at, now, self._t, fallback=fb, sweep=fb and self.chain_first)
+
+    def on_chain_miss(self, wallet: str, signature: str, reason: str) -> None:
+        """The decoder got no transaction for a notified swap (RPC failure, dropped): sweep that wallet soon.
+        `not_a_swap` is left to the regular sweep (decoder saw the transaction and found no single-mint SOL trade)."""
+        if reason == "not_a_swap" or wallet not in self._ctx:
+            return
+        at = self._clock.monotonic() + self._t.miss_poll_sec
+        if self._due.get(wallet, float("inf")) > at:
+            self._due[wallet] = at
+            self.stats.miss_polls += 1
+            self._wake.set()
+
     # ---------- active set ----------
 
     async def reload(self) -> None:
@@ -120,7 +144,8 @@ class Watcher:
         for addr, w in fresh.items():
             if addr not in self._due:
                 # spread the first round after a restart; a wallet added later is polled soon
-                spread = self._t.first_spread_sec if not self._started else 5.0
+                first = self._t.sweep_first_spread_sec if self.chain_first else self._t.first_spread_sec
+                spread = first if not self._started else 5.0
                 self._due[addr] = now + random.uniform(0, spread)
             old = self._ctx.get(addr)
             if old is not None and old.last_trade_at and (not w.last_trade_at or w.last_trade_at < old.last_trade_at):
@@ -148,6 +173,11 @@ class Watcher:
             return
         mono = self._clock.monotonic()
         self.stats.triggers += 1
+        if self.chain_first:
+            # D-2026-10-05-14: the decoder stores the event; GMGN's /vas/ budget stays with token intel
+            self.stats.chain_routed += 1
+            self.chain.enqueue(wallet, signature, self._clock.now().isoformat())
+            return
         pend = self._pending.setdefault(wallet, {})
         if not pend:
             self._attempt[wallet] = 0
@@ -277,8 +307,11 @@ class Watcher:
 
     def _annotate(self, rows: list[parse.TradeRow], source: str, mono: float) -> None:
         sigs = self.trigger.sigs if self.trigger is not None else None
+        missed = self.chain.missed if self.chain is not None else {}
         for r in rows:
             r.payload["source"] = source
+            if r.tx_hash in missed:
+                r.payload["chain_missed"] = missed[r.tx_hash]  # the decoder had it: not_a_swap / fetch_failed / …
             hit = sigs.get(r.tx_hash, mono) if sigs is not None else None
             if hit is not None:
                 r.payload["notified"] = "swap" if hit[1] else "filtered"
@@ -321,9 +354,9 @@ class Watcher:
                 params = {"wallet": addr, "limit": self._t.page_limit}
                 if cursor:
                     params["cursor"] = cursor
-                # trigger polls are the real-time path: highest priority; interval polls only catch misses
-                prio = "P0" if source == "trigger" else "P2"
-                r = await self._gw.call(E.WALLET_ACTIVITY, params=params, priority=prio)
+                # D-2026-10-05-14: /vas/ serves engine token intel (P0) and pump lists (P2) first; in vas, P3 leaves
+                # 4 tokens free, so a wallet poll never delays a survivor's intel
+                r = await self._gw.call(E.WALLET_ACTIVITY, params=params, priority="P3")
                 self.stats.pages += 1
                 pg = parse.wallet_activity(r.body, addr)
                 found.update(x.tx_hash for x in pg.items)
@@ -334,6 +367,9 @@ class Watcher:
                 live = [x for x in new if not W.is_baseline(x.trade_at, ctx.watch_started_at)]
                 self.stats.events_live += len(live)
                 self._coverage(live)
+                for x in live:
+                    if "chain_missed" in x.payload:
+                        self.stats.chain_missed_found[x.payload["chain_missed"]] += 1
                 if pg.items:
                     top = max(x.trade_at for x in pg.items)
                     newest = top if newest is None or top > newest else newest
@@ -351,10 +387,7 @@ class Watcher:
                     self.stats.chain_routed += 1
                     self.chain.enqueue(addr, sig, self._clock.now().isoformat())
             await self._wallets.record_poll(addr, self._clock.now(), ok=False, error=str(e), last_trade_at=None)
-            fb = self._fallback
-            self._due[addr] = self._clock.monotonic() + max(
-                W.interval(known_last, self._clock.now(), self._t, fallback=fb), 60.0
-            )
+            self._due[addr] = self._clock.monotonic() + max(self._interval(known_last, self._clock.now()), 60.0)
             self._resolve(addr, set(), self._clock.monotonic())
             return 0
         now = self._clock.now()
@@ -365,7 +398,7 @@ class Watcher:
         self.stats.events_new += new_total
         self.stats.last_ok_at = now
         mono = self._clock.monotonic()
-        base = W.interval(w.last_trade_at, now, self._t, fallback=self._fallback)
+        base = self._interval(w.last_trade_at, now)
         self._due[addr] = mono + base * random.uniform(1 - self._t.jitter_frac, 1 + self._t.jitter_frac)
         self._resolve(addr, found, mono)
         if new_total:
@@ -378,7 +411,13 @@ class Watcher:
             "active_wallets": len(self._ctx),
             "in_flight": len(self._inflight),
             "tiers": s.tiers,
-            "mode": "fallback (trigger healthy)" if self._fallback else "interval",
+            "mode": (
+                ("chain first, GMGN sweep" if self.chain_first else "fallback (trigger healthy)")
+                if self._fallback
+                else "interval"
+            ),
+            "miss_polls": s.miss_polls,
+            "chain_missed_found_by_gmgn": dict(s.chain_missed_found),
             "polls_ok": s.polls_ok,
             "polls_failed": s.polls_failed,
             "interval_polls": s.interval_polls,

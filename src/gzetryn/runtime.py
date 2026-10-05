@@ -66,6 +66,7 @@ class Runtime:
             self.watcher.trigger = self.trigger
             if self.t.trigger.chain_fallback:
                 self.chain = ChainFallback(self.t.trigger, self.gateway, self.feed, self.watcher.context_of, self.clock)
+                self.chain.on_miss = self.watcher.on_chain_miss
                 self.watcher.chain = self.chain
                 self.watcher.gmgn_open = lambda: self.budget.is_open(E.WALLET_ACTIVITY.group)
         self.dextools: DexTools | None = DexTools(self.t.dextools, self.budget, self.clock) if self.t.dextools.enabled else None
@@ -74,6 +75,8 @@ class Runtime:
         self.pump_chain: PumpChain | None = None
         if self.trigger is not None and self.t.pump_chain.enabled:
             async def sol_usd():
+                if self.chain is not None:  # GMGN's wSOL price, else the feed median (fewer GMGN trades since chain-first)
+                    return (await self.chain.sol_usd())[0]
                 return await self.feed.recent_sol_usd(30) or await self.feed.recent_sol_usd(1440)
 
             self.pump_chain = PumpChain(self.t.pump_chain, self.candidate_store, sol_usd, self.clock)
@@ -83,6 +86,9 @@ class Runtime:
             if self.t.candidates.enabled
             else None
         )
+        if self.candidates is not None and self.pump_chain is not None:
+            pc, idle = self.pump_chain, self.t.candidates.pump_chain_max_idle_sec
+            self.candidates.pump_chain_healthy = lambda: pc.healthy(idle)
         self.launchlab: LaunchLab | None = (
             LaunchLab(self.t.launchlab, self.budget, self.candidate_store, self.clock) if self.t.launchlab.enabled else None
         )

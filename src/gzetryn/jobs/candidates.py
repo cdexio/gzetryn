@@ -1,5 +1,6 @@
-"""Candidate source job (spec §7.1): pump.fun lists, new pairs and trending polled in the background (P3) into the
-`candidates` table; the engine reads it with a cursor (`/v1/market/candidates`) at no GMGN cost.
+"""Candidate source job (spec §7.1): pump.fun lists (P2, skipped while the pump.fun chain source is healthy), new
+pairs and trending (P3) polled in the background into the `candidates` table; the engine reads it with a cursor
+(`/v1/market/candidates`) at no GMGN cost.
 
 Trending rows carry no pool address: new trending mints get it from `mutil_window_token_info` (batches of 5) before
 they are stored, so every candidate has a pool when the engine first reads it (unless GMGN has none).
@@ -9,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections.abc import Callable
 
 from gzetryn.clock import Clock
 from gzetryn.config import CandidatesTunables
@@ -31,15 +33,23 @@ class Candidates:
         self._next: dict[str, float] = {"pump": 0.0, "new_pairs": 3.0, "trending": 6.0}
         self.stats: dict[str, dict] = {k: {"ok": 0, "failed": 0, "new": 0, "last_ok_at": None, "last_error": None}
                                        for k in self._next}
+        self.stats["pump"]["skipped_chain_healthy"] = 0
+        # set by the runtime: is the pump.fun chain source (spec §7.2) delivering? Then the /vas/ pump lists are
+        # skipped (D-2026-10-05-14)
+        self.pump_chain_healthy: Callable[[], bool] = lambda: False
         self.pools_resolved = 0
         self.pools_missing = 0
 
     def stop(self) -> None:
         self._stopped = True
 
-    async def pump(self) -> int:
+    async def pump(self) -> int | None:
+        if self._t.pump_skip_when_chain_healthy and self.pump_chain_healthy():
+            self.stats["pump"]["skipped_chain_healthy"] += 1
+            return None
+        # P2: in /vas/ below engine token intel (P0), above the wallet_activity sweep (P3)
         r = await self._gw.call(
-            E.PUMP_LISTS, body=E.pump_lists_body(self._t.pump_limit), priority="P3", max_age_sec=self._t.pump_sec / 2
+            E.PUMP_LISTS, body=E.pump_lists_body(self._t.pump_limit), priority="P2", max_age_sec=self._t.pump_sec / 2
         )
         return await self._store.upsert(parse.candidates_pump(r.body), self._clock.now())
 
@@ -101,6 +111,8 @@ class Candidates:
                 st = self.stats[name]
                 try:
                     n = await fn()
+                    if n is None:  # skipped (pump lists while the chain source is healthy)
+                        continue
                     st["ok"] += 1
                     st["new"] += n
                     st["last_ok_at"] = self._clock.now().isoformat()

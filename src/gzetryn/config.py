@@ -19,13 +19,22 @@ class GroupTunables(BaseModel):
     per_minute: float = Field(20.0, gt=0)
     burst: float = Field(4.0, ge=1)
     min_gap_sec: float = Field(1.0, ge=0)
+    # P0 (engine token intel) starts this far apart instead of min_gap_sec; None = min_gap_sec
+    p0_min_gap_sec: float | None = Field(None, ge=0)
+    # tokens a priority leaves free in this group; None = BudgetTunables.reserve
+    reserve: dict[str, float] | None = None
 
 
 def _default_groups() -> dict[str, GroupTunables]:
     return {
-        # /vas/: wallet_activity (feed), token holder/trader stats, token_traders, pump lists — the challenged group
-        # 12/min, burst 3: normal need ≈ 7.5/min; re-challenges followed reopenings that flushed 13-15 req/60 s
-        "vas": GroupTunables(per_minute=12, burst=3, min_gap_sec=1.0),
+        # /vas/: token holder/trader stats + token_traders (engine intel), pump lists, wallet_activity — the
+        # challenged group. D-2026-10-05-14: intel first. Burst 5 with P2/P3 leaving 4 tokens, so the 4 vas calls of
+        # one survivor (holder_stat, trader_stat, token_traders x2) always find tokens and start 0.25 s apart
+        # (min gap 1 s made them take >= 3 s of the engine's 4 s timeout). 12/min: re-challenges followed reopenings
+        # that flushed 13-15 req/60 s. [TUNABLE]
+        "vas": GroupTunables(
+            per_minute=12, burst=5, min_gap_sec=1.0, p0_min_gap_sec=0.25, reserve={"P0": 0, "P1": 0, "P2": 4, "P3": 4}
+        ),
         "api": GroupTunables(per_minute=30, burst=8, min_gap_sec=0.3),
         "defi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),
         "mrwapi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),
@@ -37,18 +46,23 @@ def _default_groups() -> dict[str, GroupTunables]:
 
 
 class BudgetTunables(BaseModel):
-    """Request budget (spec §10). Priorities: P0 trigger polls, P1 API calls (engine), P2 interval polls,
-    P3 background (ranks, metrics, candidates). Strict priority inside a group: a lower priority never takes a token
-    while a higher one is waiting there."""
+    """Request budget (spec §10). Priorities (D-2026-10-05-14): P0 engine token intel (per Migration survivor, the
+    engine waits 4 s), P1 other API calls and chain-event enrichment, P2 pump lists, P3 background (wallet_activity
+    sweep, ranks, metrics, other candidate lists). Strict priority inside a group: a lower priority never takes a
+    token while a higher one is waiting there."""
 
     per_minute: int = Field(60, ge=1)  # global cap over all groups
     burst: int = Field(15, ge=1)
     min_gap_sec: float = Field(0.25, ge=0)  # global gap between two request starts
+    # [TUNABLE] global gap for P0: one survivor's ~9 intel calls over 4 groups would otherwise need >= 2 s to start
+    p0_global_gap_sec: float = Field(0.05, ge=0)
     groups: dict[str, GroupTunables] = Field(default_factory=_default_groups)
     # tokens a priority leaves free in its group (P0/P1 may take the last token)
     reserve: dict[str, float] = Field(default_factory=lambda: {"P0": 0.0, "P1": 0.0, "P2": 1.0, "P3": 2.0})
+    # P0 3 s [TUNABLE]: the engine aborts intel after 4 s, so a P0 call that cannot start within 3 s answers
+    # "unavailable" at once instead of waiting (e.g. while /vas/ is cooling or another request probes it)
     max_wait_sec: dict[str, float] = Field(
-        default_factory=lambda: {"P0": 20.0, "P1": 30.0, "P2": 60.0, "P3": 120.0}
+        default_factory=lambda: {"P0": 3.0, "P1": 30.0, "P2": 60.0, "P3": 120.0}
     )
     # per-group cooldown after a 429/403: start, doubling on every consecutive throttle (failed probe), cap; reset by
     # the first success. 2026-10-05: /vas/ blocks outlast 300 s (probes at +300 s kept hitting 429) → cap 3600 s
@@ -66,7 +80,7 @@ class BudgetTunables(BaseModel):
     @model_validator(mode="after")
     def _check(self) -> BudgetTunables:
         for name, g in self.groups.items():
-            for p, r in self.reserve.items():
+            for p, r in {**self.reserve, **(g.reserve or {})}.items():
                 if r >= g.burst:
                     raise ValueError(f"budget: reserve {p}={r} must be < burst of group {name}")
         return self
@@ -143,12 +157,27 @@ class WatchTunables(BaseModel):
     fallback_hot_interval_sec: float = 120.0
     fallback_warm_interval_sec: float = 300.0
     fallback_cold_interval_sec: float = 900.0
+    # sweep intervals while notified swaps go to the chain decoder (trigger.chain_first and the trigger healthy).
+    # The sweep finds what the chain path cannot see: 5 Oct 06:40-16:40 UTC, 95 of 1,458 live trades (6.5 %) were
+    # not notified or classified not swap-like, 25 more notified swaps were missed by trigger poll + decoder.
+    # 77 wallets (56 warm, 21 cold) → ~133 /vas/ requests/h instead of ~756/h at 300/900 s. [TUNABLE]
+    sweep_hot_interval_sec: float = 900.0
+    sweep_warm_interval_sec: float = 1800.0
+    sweep_cold_interval_sec: float = 3600.0
+    sweep_first_spread_sec: float = 900.0  # [TUNABLE] first sweep after a start spread over this (no 77-poll burst)
+    # [TUNABLE] a notified swap the decoder could not fetch (RPC failure, dropped) pulls that wallet's sweep to now+this
+    miss_poll_sec: float = 60.0
     jitter_frac: float = 0.15
     page_limit: int = Field(20, ge=1, le=50)
     max_pages: int = Field(3, ge=1, le=10)
     max_concurrent: int = Field(2, ge=1)
     first_spread_sec: float = 120.0  # first polls after start are spread over this window
     tick_sec: float = 0.25
+
+
+class RpcEndpoint(BaseModel):
+    url: str
+    min_gap_sec: float = Field(2.0, ge=0)  # [TUNABLE] between two calls to this endpoint
 
 
 class TriggerTunables(BaseModel):
@@ -170,11 +199,22 @@ class TriggerTunables(BaseModel):
     min_gap_sec: float = 2.0  # between two triggered polls of one wallet
     max_polls_per_min: int = 10  # triggered polls per wallet per minute; above → left to fallback polling
     sig_cache_sec: float = 1800.0  # notified signatures remembered for coverage stats
-    # chain fallback (spec §6.2): while GMGN's /vas/ group is challenged, decode the notified swap from the chain
+    # chain decoder (spec §6.2): decode the notified swap from the transaction itself
     chain_fallback: bool = True
-    rpc_url: str = "https://api.mainnet-beta.solana.com"  # free public RPC; 429 after ~16 getTransaction in 8 s
-    rpc_min_gap_sec: float = 2.0  # 1 call per 2.5 s ran clean (verified)
-    rpc_backoff_sec: float = 30.0  # after an RPC 429
+    # D-2026-10-05-14: every notified swap goes to the chain decoder, also while /vas/ is open; GMGN wallet_activity
+    # only sweeps for trades the chain path cannot see (not notified, classifier misses, decoder misses). False =
+    # the old GMGN trigger poll, chain only while /vas/ is closed.
+    chain_first: bool = True
+    # free public RPCs for getTransaction, used in turn by the soonest free one, each paced on its own:
+    # mainnet-beta returned 429 after ~16 calls in 8 s (1 per 2.5 s clean); PublicNode 80/80 at 0.5 s and 60/60 at
+    # 1 s, p50 0.27 s (2026-10-05 15:00 UTC). Bursts of 14 swaps/min queued up to ~60 s on mainnet-beta alone.
+    rpc_endpoints: list[RpcEndpoint] = Field(
+        default_factory=lambda: [
+            RpcEndpoint(url="https://solana-rpc.publicnode.com", min_gap_sec=1.0),
+            RpcEndpoint(url="https://api.mainnet-beta.solana.com", min_gap_sec=2.0),
+        ]
+    )
+    rpc_backoff_sec: float = 30.0  # after an RPC 429 (that endpoint only)
     rpc_retries: int = 3  # tx not found yet (RPC index lag) → retry every 2 s
     chain_max_age_sec: float = 120.0  # drop a queued signature older than this (GMGN fallback polling catches it)
     chain_queue_max: int = 200
@@ -187,6 +227,12 @@ class CandidatesTunables(BaseModel):
     enabled: bool = True
     pump_sec: float = 30.0  # POST /vas/api/v1/rank/sol (new / completing / completed) — the challenged group
     pump_limit: int = Field(50, ge=1, le=100)
+    # D-2026-10-05-14: skip the pump lists while the pump.fun chain source is healthy (transactions within this many
+    # seconds). 5 Oct 12:29-14:40 UTC: chain saw 90 of 92 migrated first (the 2 others completed before the chain
+    # source started / during a restart); the engine drops completing and bonding-curve `new` rows, and reads
+    # `first` metrics only, so the lists' later tag counts in `last` never reached it. [TUNABLE]
+    pump_skip_when_chain_healthy: bool = True
+    pump_chain_max_idle_sec: float = 120.0
     new_pairs_sec: float = 30.0  # /api/v1/pairs/sol/new_pairs/1m
     new_pairs_interval: str = "1m"
     new_pairs_limit: int = Field(50, ge=1, le=100)

@@ -29,6 +29,12 @@ def group_of(path: str) -> str:
     return path.lstrip("/").split("/", 1)[0] or "other"
 
 
+def request_class(endpoint: Endpoint, priority: str) -> str:
+    """Request class reported per group in /v1/stats (D-2026-10-05-14): P0 calls are engine token intel
+    (`intel`), everything else is named after its endpoint (in `vas`: `pump_lists`, `wallet_activity`)."""
+    return "intel" if priority == "P0" else endpoint.name
+
+
 RANK_WALLETS = Endpoint("rank_wallets", "/defi/quotation/v1/rank/{chain}/wallets/{period}", fixed={"direction": "desc"})
 WALLET_ACTIVITY = Endpoint(
     "wallet_activity", "/vas/api/v1/wallet_activity/{chain}", fixed={"type": ["buy", "sell"]}

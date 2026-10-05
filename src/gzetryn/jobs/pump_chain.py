@@ -51,6 +51,7 @@ class PumpChain:
         self._queue: dict[tuple[str, str], tuple[CandidateRow, float, bool]] = {}
         self._sol_price: tuple[float, float | None] = (-1e9, None)
         self._stopped = False
+        self.last_tx_mono = -1e9
         self.fresh_new = deque(maxlen=2000)  # first sightings: row write time − event block time (s)
         self.fresh_updates = deque(maxlen=2000)
         self.stats = {
@@ -73,7 +74,12 @@ class PumpChain:
 
     # ---------- WS handler (sync, called on the event loop for every successful pump transaction) ----------
 
+    def healthy(self, max_idle_sec: float) -> bool:
+        """pump.fun transactions are arriving (the program stream carries ~10 MB/30 s, so idle = not subscribed)."""
+        return self._clock.monotonic() - self.last_tx_mono <= max_idle_sec
+
     def on_logs(self, signature: str, slot: int, logs: list[str]) -> None:
+        self.last_tx_mono = self._clock.monotonic()
         self.stats["transactions"] += 1
         for kind, d in S.events_from_logs(logs):
             try:

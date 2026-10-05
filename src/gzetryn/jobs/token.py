@@ -1,4 +1,5 @@
-"""Token intel (spec §7): up to 10 cached GMGN calls + our feed, assembled per part; partial failures per part."""
+"""Token intel (spec §7): up to 10 cached GMGN calls + our feed, assembled per part; partial failures per part.
+All GMGN calls run at P0, the top priority of every group (D-2026-10-05-14)."""
 
 from __future__ import annotations
 
@@ -31,7 +32,9 @@ class TokenIntel:
         results: list[Result] = []
 
         async def call(ep: E.Endpoint, **kw) -> Any:
-            r = await self._gw.call(ep, priority="P1", consumer=consumer, max_age_sec=max_age_sec, **kw)
+            # P0 (D-2026-10-05-14): token intel comes first in every group; the engine waits 4 s per survivor, so a
+            # call that cannot start within max_wait_sec.P0 (3 s) fails this part fast ("unavailable")
+            r = await self._gw.call(ep, priority="P0", consumer=consumer, max_age_sec=max_age_sec, **kw)
             results.append(r)
             return r.body
 

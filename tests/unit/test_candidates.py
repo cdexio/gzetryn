@@ -6,6 +6,29 @@ from gzetryn.gmgn import parse
 from tests.conftest import load_fixture
 
 
+async def test_pump_lists_skipped_while_chain_source_healthy():
+    from gzetryn.clock import FakeClock
+    from gzetryn.config import CandidatesTunables, Tunables
+    from gzetryn.gateway.budget import Budget
+    from gzetryn.gateway.gateway import Gateway
+    from gzetryn.jobs.candidates import Candidates
+    from tests.conftest import FakeTransport
+
+    class Store:
+        rows = []
+
+        async def upsert(self, rows, at):
+            self.rows.extend(rows)
+            return len(rows)
+
+    clock, t, tr = FakeClock(), Tunables(), FakeTransport()
+    c = Candidates(CandidatesTunables(), Gateway(t, tr, Budget(t.budget, clock), clock=clock), Store(), clock)
+    c.pump_chain_healthy = lambda: True
+    assert await c.pump() is None and tr.calls == [] and c.stats["pump"]["skipped_chain_healthy"] == 1
+    c.pump_chain_healthy = lambda: False  # chain source idle → GMGN lists again
+    assert await c.pump() > 0 and [x[0] for x in tr.calls] == ["pump_lists"]
+
+
 def test_pump_lists_kinds_and_pools():
     rows = parse.candidates_pump(load_fixture("trenches.json"))
     assert [r.kind for r in rows] == ["new", "new", "completing", "completing", "migrated", "migrated"]

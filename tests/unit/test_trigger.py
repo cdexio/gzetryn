@@ -120,4 +120,33 @@ def test_intervals_and_retry_schedule():
     t = WatchTunables()
     assert W.interval(None, FakeClock().now(), t, fallback=True) == t.fallback_cold_interval_sec
     assert W.interval(None, FakeClock().now(), t) == t.cold_interval_sec
+    assert W.interval(None, FakeClock().now(), t, fallback=True, sweep=True) == t.sweep_cold_interval_sec == 3600
     assert [W.next_retry(n, [2, 4]) for n in (1, 2, 3)] == [2, 4, None]
+
+
+class _Chain:
+    def __init__(self):
+        self.jobs = []
+        self.missed = {}
+
+    def enqueue(self, wallet, sig, notified_at):
+        self.jobs.append((wallet, sig))
+
+
+def test_chain_first_routes_every_notification_without_gmgn_poll():
+    w, clock = _watcher()
+    w.chain = _Chain()  # type: ignore[assignment]
+    w.gmgn_open = lambda: True  # /vas/ open: still no GMGN trigger poll (D-2026-10-05-14)
+    w.on_trade(WALLET, "s1", 1)
+    assert w.chain.jobs == [(WALLET, "s1")] and w.stats.chain_routed == 1
+    assert WALLET not in w._trig_due and WALLET not in w._pending
+    # a notification the decoder could not fetch pulls the wallet's sweep forward; not_a_swap does not
+    w._due[WALLET] = clock.monotonic() + 3000
+    w.on_chain_miss(WALLET, "s1", "not_a_swap")
+    assert w._due[WALLET] == pytest.approx(clock.monotonic() + 3000) and w.stats.miss_polls == 0
+    w.on_chain_miss(WALLET, "s1", "fetch_failed")
+    assert w._due[WALLET] == pytest.approx(clock.monotonic() + 60) and w.stats.miss_polls == 1
+    # legacy mode: GMGN trigger poll as before
+    w._tt.chain_first = False
+    w.on_trade(WALLET, "s2", 1)
+    assert WALLET in w._trig_due and len(w.chain.jobs) == 1

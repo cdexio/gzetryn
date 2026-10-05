@@ -192,6 +192,9 @@ polls exactly the active set.
 
 ### 6.1 On-chain trigger (owner decision 2026-10-03: "real-time, at most a few seconds")
 
+(Since D-2026-10-05-14 the notification goes to the chain decoder, §6.2, not
+to a GMGN poll; the GMGN trigger poll below is the `chain_first: false` mode.)
+
 Faster GMGN interval polling is rejected (38 wallets every ~5 s ≈ 450
 req/min, ~4× the rate proven clean; a Cloudflare block of the VPS IP would
 stop everything). Instead a free Solana WebSocket says *when* a wallet
@@ -238,7 +241,43 @@ transacted, and GMGN is polled only then.
   notification to GMGN index, timeouts, caps, coverage (notified / filtered
   / not notified) and live lag p50/p90 per source.
 
-### 6.2 Chain fallback (2026-10-05)
+### 6.2 Chain decoder (2026-10-05; primary path since D-2026-10-05-14)
+
+**Chain first** (owner D-2026-10-05-14, phase 13): every swap-like notification
+goes to the chain decoder, also while `/vas/` is open; the GMGN trigger poll
+of §6.1 is off (`trigger.chain_first`; `false` restores it). Reason: `/vas/`
+was blocked 40–47 min/h on 5 Oct, the decoder matched GMGN side and token
+amount exactly (10/10), and GMGN's token tags (smart traders, holder/trader
+counts by tag) have no other source — the `/vas/` window goes to them.
+GMGN `wallet_activity` becomes a P3 **sweep** per wallet every 900 / 1800 /
+3600 s by recency `[TUNABLE]` (77 wallets ≈ 133 req/h instead of ≈ 756/h)
+for what the chain path cannot see: on 5 Oct 06:40–16:40 UTC 95 of 1,458
+live trades (6.5 %) were not notified or classified not swap-like, 25 more
+notified swaps were missed by trigger poll and decoder. A notified swap the
+decoder could not fetch (RPC failure, dropped) pulls that wallet's sweep to
++60 s; `not_a_swap` does not (the decoder saw the transaction). Signatures
+the decoder dropped are remembered, and a sweep that finds them as GMGN
+trades counts them per reason (`chain_missed_found_by_gmgn`) and marks the
+event `payload.chain_missed`, to measure the decoder's real miss rate. The
+first sweep after a start is spread over 900 s (no 77-poll burst). The
+engine reads only wallet, mint, side, SOL/USD amounts, price, symbol, time
+and signature from the feed, so the GMGN-only fields (`open_or_close`,
+launchpad) get no enrichment pass.
+
+Throughput: bursts of 14 notified swaps/min queued up to ~60 s behind the
+single public RPC paced at 2 s. The decoder now uses two free RPCs, each
+paced on its own, the soonest free one first: PublicNode
+(`https://solana-rpc.publicnode.com`, verified 2026-10-05: 80/80 calls at
+0.5 s and 60/60 at 1 s, p50 0.27 s; Python's default user agent gets 403,
+curl_cffi's browser one 200) at 1.0 s `[TUNABLE]`, and mainnet-beta at 2.0 s;
+together ≈ 90 calls/min. RPC calls are serial; enrichment and insert run in
+their own tasks; a transaction the RPC has not indexed yet is retried 2 s
+later without blocking the queue. Chain-event enrichment runs at P1 (below
+engine intel). SOL/USD is GMGN's wSOL price from `mutil_window_token_info`
+(`/api/`, verified 119.45 on 2026-10-05), else the feed median, also for the
+pump.fun chain candidates.
+
+Before phase 13:
 
 Measured: once Cloudflare challenges GMGN's `/vas/` group (wallet_activity),
 it stays challenged for tens of minutes regardless of our rate (still
@@ -330,8 +369,8 @@ Expected extra load with `parts=security,launchpad,dev,dev_history,holders,smart
 9 GMGN calls per cold token (4 on `/vas/`) → ≈ 2,250–2,700 calls/day ≈
 **1.6–1.9 req/min** on average (≈ 0.7–0.8/min on `/vas/`), paced per group.
 
-Default `parts` = all (≤ 10 GMGN calls on a cold cache, P1 — below the
-trigger's P0). A failing
+Default `parts` = all (≤ 10 GMGN calls on a cold cache, P0 — the top
+priority of every group since D-2026-10-05-14, §10). A failing
 part is returned as `errors.{part}` while the rest is served; the call
 fails (503) only when every GMGN part fails. `max_age_sec` lowers the
 accepted cache age.
@@ -366,6 +405,15 @@ never returns a candidate twice per kind.
 - Load: pump lists 2/min (`/vas/`), new pairs 2/min (`/api/`), trending
   1/min (`/defi/`), pool resolution ≤ 4 calls/min (`/api/`). Retention 7
   days after the last sighting.
+- **Pump lists skipped while the chain source delivers** (D-2026-10-05-14,
+  phase 13): when the pump.fun chain reader (§7.2) received a transaction
+  in the last 120 s `[TUNABLE]`, the `/vas/` pump lists are not polled (P2
+  otherwise). Data 5 Oct 12:29–14:40 UTC: the chain saw 90 of 92 `migrated`
+  first (the other 2 completed before the chain source started or during a
+  restart); the engine drops `completing` and bonding-curve `new` rows and
+  reads `first` metrics only, so the lists' tag counts merged into `last`
+  never reached it. Lost while skipped: pump.fun bonding-curve `new` rows
+  (no consumer).
 - `GET /v1/market/candidates?kind=&after=&limit=&wait=` (section 11).
 
 ### 7.2 pump.fun completing / migrated from the chain (owner decision D-2026-10-05-11)
@@ -462,14 +510,25 @@ throttles into ~7,800 s of total blackout in 49 h.
   and step are logged with every throttle and shown in `/health`. Other
   groups keep working. A **global** pause (60 s) happens only when 2+
   groups are cooling at the same time.
-- **Priorities, strict inside a group**: P0 trigger polls (the real-time
-  feed), P1 API calls (engine: token enricher, market, stats), P2 interval
-  polls, P3 background (ranks, wallet metrics, candidate lists). A lower
-  priority never takes a group token while a higher one waits there;
-  reserves: P2 leaves 1 token, P3 leaves 2. Wait limits P0 20 s, P1 30 s,
-  P2 60 s, P3 120 s; a call that cannot be served returns cached data with
-  `stale: true` or `503 {reason: cooldown:<group> | budget | throttled}`
-  + `Retry-After`. Trigger polls also have their own concurrency slots.
+- **Priorities, strict inside a group** (D-2026-10-05-14, phase 13): P0
+  engine token intel (`/v1/token`, once per Migration survivor; the engine
+  aborts after 4 s), P1 other API calls and chain-event enrichment, P2 pump
+  lists, P3 wallet_activity sweep and background (ranks, wallet metrics,
+  new pairs, trending). A lower priority never takes a group token while a
+  higher one waits there; reserves: P2 leaves 1 token, P3 leaves 2, and in
+  `vas` (burst 5) P2/P3 leave 4 — one survivor's four `vas` calls
+  (holder_stat, trader_stat, token_traders × 2) always find tokens. P0
+  starts 0.25 s apart in `vas` (instead of 1 s) and 0.05 s apart globally
+  (instead of 0.25 s) `[TUNABLE]`: with the 1 s gap the four `vas` calls
+  alone took ≥ 3 s, and on 5 Oct 5 of 17 engine intel calls timed out at
+  4 s while `/vas/` was open. Wait limits P0 3 s `[TUNABLE]`, P1 30 s, P2
+  60 s, P3 120 s, so a P0 part whose group is cooling or being probed fails
+  at once; a call that cannot be served returns cached data with `stale:
+  true` or `503 {reason: cooldown:<group> | budget | throttled}` +
+  `Retry-After`. Pump lists are skipped while the pump.fun chain source
+  delivers (§7.1). `/v1/stats` reports requests per class per group
+  (`intel` = P0, else the endpoint): sent, ok, throttled, denied, cache,
+  sent in the last hour.
 - **Measuring what GMGN tolerates**: per group, request starts in the last
   10/60/300 s now, their peaks since start, and the counts just before
   each throttle (also written to the throttle sample) — in `/v1/stats`

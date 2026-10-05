@@ -171,6 +171,7 @@ class RuntimeStatus:
             ep: {**dict(o), "avg_latency_ms": round(lat[ep][0] / lat[ep][1], 1) if lat[ep][1] else None}
             for ep, o in by_ep.items()
         }
+        classes = rt.gateway.class_report()
         day = await rt.ops.requests_since(now - timedelta(hours=24))
         day_total = sum(e["requests"] for e in day.values())
         throttled_24h = sum(e["outcomes"].get("throttled", 0) for e in day.values())
@@ -198,8 +199,9 @@ class RuntimeStatus:
                 "granted": rt.budget.granted,
                 "denied": rt.budget.denied,
                 # per path group: limits, tokens, cooldown, throttles, request counts in the last 10/60/300 s now,
-                # their peaks since start, and the counts right before the last throttle (= what GMGN tolerated)
-                "groups": rt.budget.report(),
+                # their peaks since start, and the counts right before the last throttle (= what GMGN tolerated);
+                # `classes`: requests per class (intel = P0 engine token intel, else the endpoint) since start
+                "groups": {n: {**g, "classes": classes.get(n, {})} for n, g in rt.budget.report().items()},
             },
             "candidates": rt.candidates.summary() if rt.candidates is not None else None,
             "pump_chain": rt.pump_chain.summary() if rt.pump_chain is not None else None,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -14,7 +14,7 @@ from gzetryn.config import Tunables
 from gzetryn.gateway.budget import Budget, Denied
 from gzetryn.gateway.cache import TtlCache, cache_key
 from gzetryn.gmgn import answer as A
-from gzetryn.gmgn.endpoints import Endpoint
+from gzetryn.gmgn.endpoints import Endpoint, request_class
 from gzetryn.log import fields, get_logger
 from gzetryn.transport.http import Transport
 
@@ -90,6 +90,9 @@ class Gateway:
         self._inflight: dict[tuple, asyncio.Future] = {}
         self.counts: Counter[tuple[str, str, str]] = Counter()  # (consumer, endpoint, outcome)
         self.latency_ms: defaultdict[tuple[str, str, str], float] = defaultdict(float)
+        # request classes per group (D-2026-10-05-14): P0 = engine token intel, else the endpoint name
+        self.class_counts: Counter[tuple[str, str, str]] = Counter()  # (group, class, sent|ok|throttled|denied|cache)
+        self._class_sent: defaultdict[tuple[str, str], deque] = defaultdict(lambda: deque(maxlen=20_000))
         self.last_ok_at: datetime | None = None
         self.last_throttle_at: datetime | None = None
         self.last_error: str | None = None
@@ -104,6 +107,22 @@ class Gateway:
 
     def ttl(self, endpoint: Endpoint) -> int:
         return self._t.cache.ttl_sec.get(endpoint.name, 0)
+
+    def class_report(self) -> dict[str, dict[str, dict]]:
+        """{group: {class: {sent, ok, throttled, denied, cache, sent_last_hour}}} since start."""
+        now = self._clock.monotonic()
+        out: dict[str, dict[str, dict]] = {}
+        keys = {(g, c) for g, c, _ in self.class_counts}
+        for g, c in sorted(keys):
+            sent = self._class_sent.get((g, c)) or ()
+            out.setdefault(g, {})[c] = {
+                **{k: self.class_counts.get((g, c, k), 0) for k in ("sent", "ok", "throttled", "denied", "cache")},
+                "sent_last_hour": sum(1 for x in sent if now - x <= 3600),
+            }
+        return out
+
+    def _cls(self, endpoint: Endpoint, priority: str) -> tuple[str, str]:
+        return endpoint.group, request_class(endpoint, priority)
 
     async def call(
         self,
@@ -124,6 +143,7 @@ class Gateway:
             if hit is not None:
                 entry, age = hit
                 self.counts[(consumer, endpoint.name, "cache")] += 1
+                self.class_counts[(*self._cls(endpoint, priority), "cache")] += 1
                 return Result(entry.value, entry.fetched_at, cached=True, age_sec=age)
         if key in self._inflight:
             self.counts[(consumer, endpoint.name, "shared")] += 1
@@ -155,18 +175,24 @@ class Gateway:
     ) -> Result:
         reason, retry_after = "unavailable", 30.0
         group = endpoint.group
+        gc = self._cls(endpoint, priority)
         for attempt in range(2):
             try:
                 await self._budget.take(priority, group)
             except Denied as d:
                 self.counts[(consumer, endpoint.name, "denied")] += 1
+                self.class_counts[(*gc, "denied")] += 1
                 reason, retry_after = d.reason, d.retry_after
                 break
+            self.class_counts[(*gc, "sent")] += 1
+            self._class_sent[gc].append(self._clock.monotonic())
             raw = await self._transport.request(endpoint, path, params, body)
             v = A.classify(raw)
             ck = (consumer, endpoint.name, v.outcome)
             self.counts[ck] += 1
             self.latency_ms[ck] += raw.latency_ms
+            if v.outcome in (A.OK, A.THROTTLED):
+                self.class_counts[(*gc, "ok" if v.outcome == A.OK else "throttled")] += 1
             now = self._clock.now()
             if v.outcome == A.OK:
                 self._budget.ok(group)
