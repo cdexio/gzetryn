@@ -49,3 +49,11 @@
 
 - Undocumented API; 500 on unknown parameters. Cooldown + probe protect it; stats show failures.
 - The 1–2 min indexing lag; fix = chain reader on LaunchLab program logs (measured cheap) once its layout is verified.
+
+## Live (deployed `6ce004b` 12:49 UTC, checked 13:00)
+
+- Rows: `new` 25 (StonkFun 22, letsbonk.fun 1, Brim 1, stonk 1) + `completing` 6 (StonkFun, finishingRate
+  29.8–41.4 %), every row with its LaunchLab pool; more LaunchLab launches already had a `new` row from GMGN new
+  pairs and were merged (one row per kind + mint).
+- Calls: ≈ 6/min on the `launchlab` line, 0 failures, 0 throttles; peak 5 requests in 60 s.
+- Freshness: bounded by LaunchLab's own indexing (13–119 s, p50 79 s, measured in the probe) + ≤ 15 s polling.

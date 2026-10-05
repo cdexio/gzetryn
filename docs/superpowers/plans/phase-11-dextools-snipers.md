@@ -35,3 +35,10 @@
 ## Risks
 
 Undocumented web endpoint; Cloudflare may challenge it → cooldown, part error, other parts unaffected.
+
+## Live (deployed `ad180e7` 12:59 UTC)
+
+- Migrated pump.fun tokens (chain rows): `available`, 27 and 34 snipers (creator included, creator_is_sniper
+  true), 1.1–1.9 s cold, through the `dextools` line (2 calls, 0 errors).
+- Bonding-curve tokens: `available: false` in 0.3 s without a DEXTools call (4/4).
+- Engine wiring left to the coordinator (`parts=…,snipers`).
