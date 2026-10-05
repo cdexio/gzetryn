@@ -160,6 +160,15 @@ class TriggerTunables(BaseModel):
     min_gap_sec: float = 2.0  # between two triggered polls of one wallet
     max_polls_per_min: int = 10  # triggered polls per wallet per minute; above → left to fallback polling
     sig_cache_sec: float = 1800.0  # notified signatures remembered for coverage stats
+    # chain fallback (spec §6.2): while GMGN's /vas/ group is challenged, decode the notified swap from the chain
+    chain_fallback: bool = True
+    rpc_url: str = "https://api.mainnet-beta.solana.com"  # free public RPC; 429 after ~16 getTransaction in 8 s
+    rpc_min_gap_sec: float = 2.0  # 1 call per 2.5 s ran clean (verified)
+    rpc_backoff_sec: float = 30.0  # after an RPC 429
+    rpc_retries: int = 3  # tx not found yet (RPC index lag) → retry every 2 s
+    chain_max_age_sec: float = 120.0  # drop a queued signature older than this (GMGN fallback polling catches it)
+    chain_queue_max: int = 200
+    sol_usd_window_min: int = 30  # SOL/USD from the median of GMGN trades in the feed over this window
 
 
 class CandidatesTunables(BaseModel):

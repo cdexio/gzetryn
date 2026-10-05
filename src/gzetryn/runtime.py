@@ -10,7 +10,9 @@ from gzetryn.clock import Clock
 from gzetryn.config import Settings, Tunables
 from gzetryn.gateway.budget import Budget
 from gzetryn.gateway.gateway import Gateway
+from gzetryn.gmgn import endpoints as E
 from gzetryn.jobs.candidates import Candidates
+from gzetryn.jobs.chain_fallback import ChainFallback
 from gzetryn.jobs.directory import Directory
 from gzetryn.jobs.token import TokenIntel
 from gzetryn.jobs.watcher import Watcher
@@ -54,9 +56,14 @@ class Runtime:
         self.directory = Directory(self.t, self.gateway, self.wallets, self.clock)
         self.watcher = Watcher(self.t.watch, self.gateway, self.wallets, self.feed, self.clock, self.t.trigger)
         self.trigger: WsTrigger | None = None
+        self.chain: ChainFallback | None = None
         if self.t.trigger.enabled:
             self.trigger = WsTrigger(self.t.trigger, self.watcher.on_trade, self.clock)
             self.watcher.trigger = self.trigger
+            if self.t.trigger.chain_fallback:
+                self.chain = ChainFallback(self.t.trigger, self.gateway, self.feed, self.watcher.context_of, self.clock)
+                self.watcher.chain = self.chain
+                self.watcher.gmgn_open = lambda: self.budget.is_open(E.WALLET_ACTIVITY.group)
         self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed)
         self.candidate_store = CandidateStore(self.sessions)
         self.candidates: Candidates | None = (
@@ -79,6 +86,8 @@ class Runtime:
             self._tasks.append(asyncio.create_task(self.watcher.run(), name="watcher"))
             if self.trigger is not None:
                 self._tasks.append(asyncio.create_task(self.trigger.run(), name="trigger"))
+            if self.chain is not None:
+                self._tasks.append(asyncio.create_task(self.chain.run(), name="chain"))
         if self.candidates is not None:
             self._tasks.append(asyncio.create_task(self.candidates.run(), name="candidates"))
         self._tasks.append(asyncio.create_task(self._every(60, self._flush_counts), name="counts"))
@@ -116,6 +125,8 @@ class Runtime:
         self.watcher.stop()
         if self.trigger is not None:
             self.trigger.stop()
+        if self.chain is not None:
+            self.chain.stop()
         if self.candidates is not None:
             self.candidates.stop()
         for t in self._tasks:

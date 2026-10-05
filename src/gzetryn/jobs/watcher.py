@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import random
 from collections import Counter, deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -60,6 +61,7 @@ class WatchStats:
     cov_filtered: int = 0  # notified but classified not swap-like → found later by an interval poll
     cov_not_notified: int = 0
     cov_trigger_down: int = 0
+    chain_routed: int = 0  # notified signatures handed to the chain fallback
 
 
 class Watcher:
@@ -79,6 +81,8 @@ class Watcher:
         self._feed = feed
         self._clock = clock or Clock()
         self.trigger = None  # WsTrigger, attached by the runtime
+        self.chain = None  # ChainFallback, attached by the runtime (spec §6.2)
+        self.gmgn_open: Callable[[], bool] = lambda: True  # is GMGN's /vas/ group (wallet_activity) open?
         self._ctx: dict[str, Wallet] = {}
         self._due: dict[str, float] = {}
         self._trig_due: dict[str, float] = {}
@@ -149,6 +153,14 @@ class Watcher:
             self._attempt[wallet] = 0
         pend[signature] = (mono, mono + self._tt.max_wait_sec)
         self._schedule_trigger(wallet, mono + self._tt.debounce_sec)
+        if self.chain is not None and not self.gmgn_open():
+            # GMGN's wallet_activity group is challenged: decode this trade from the chain right away
+            self.stats.chain_routed += 1
+            self.chain.enqueue(wallet, signature, self._clock.now().isoformat())
+
+    def context_of(self, wallet: str) -> WalletContext | None:
+        w = self._ctx.get(wallet)
+        return self._context(w) if w is not None else None
 
     def _schedule_trigger(self, wallet: str, at: float) -> bool:
         mono = self._clock.monotonic()
@@ -334,6 +346,10 @@ class Watcher:
         except GatewayError as e:
             self.stats.polls_failed += 1
             self.stats.last_error = f"{addr[:8]}: {e}"
+            if source == "trigger" and self.chain is not None:
+                for sig in list(self._pending.get(addr, {})):
+                    self.stats.chain_routed += 1
+                    self.chain.enqueue(addr, sig, self._clock.now().isoformat())
             await self._wallets.record_poll(addr, self._clock.now(), ok=False, error=str(e), last_trade_at=None)
             fb = self._fallback
             self._due[addr] = self._clock.monotonic() + max(
@@ -389,5 +405,7 @@ class Watcher:
                     "not_notified": s.cov_not_notified,
                     "while_trigger_down": s.cov_trigger_down,
                 },
+                "chain_routed": s.chain_routed,
+                "chain": self.chain.summary() if self.chain is not None else None,
             }
         return out

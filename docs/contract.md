@@ -89,10 +89,17 @@ Semantics:
   trades wait for the cooldown to end. If the
   trigger is down or missed a transaction, interval polling catches the trade (every 120/300/900 s by recency while
   the trigger is healthy, 45/90/300 s while it is down), with a larger `lag_sec`. `payload.source` says which path
-  found the event (`trigger` | `interval`); `payload.notified` (`swap` | `filtered`) and `payload.notified_at` are
+  found the event (`trigger` | `interval` | `chain`); `payload.notified` (`swap` | `filtered`) and `payload.notified_at` are
   set when the WebSocket saw the transaction. `/health` → `components.trigger` shows whether the fast path is up. A wallet's `watch.last_poll_ok_at` shows gaps; trades during a gap
   arrive late (larger `lag_sec`), never twice.
-- Identity: `(wallet, tx_hash, mint, side, token_amount)`.
+- **`source = chain`** (since 2026-10-05): while GMGN challenges the `vas` group, the trade is decoded from the
+  Solana transaction instead, so the feed stays real-time. Differences from a GMGN event: `sol_amount` is what the
+  wallet actually paid/received (DEX fees and tips included, 0.4–2.2 % off GMGN's figure); `usd_amount`,
+  `price_usd`, `mcap_usd` use a SOL/USD estimate from recent GMGN trades (`payload.sol_usd`); `open_or_close`,
+  `launchpad`, `launchpad_platform` are null; `symbol`/`total_supply` come from GMGN token info and can be null.
+  Only single-token ↔ SOL swaps are decoded; other shapes wait for GMGN.
+- Identity: `(wallet, tx_hash, mint, side)` — a trade is one event whichever path found it first (when `vas`
+  reopens, GMGN's row for a chain-decoded trade is not added again).
 
 ## Token intel
 

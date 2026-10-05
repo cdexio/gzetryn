@@ -107,18 +107,20 @@ class FeedStore:
             )
         async with self._sessions() as s, s.begin():
             await s.execute(text("select pg_advisory_xact_lock(:k)"), {"k": FEED_LOCK})
-            # skip rows we already have, so re-polled pages do not burn sequence values (ON CONFLICT still guards)
+            # skip trades we already have, so re-polled pages do not burn sequence values (ON CONFLICT still guards).
+            # Matched on (tx_hash, mint, side) without the amount: a chain-decoded event (spec §6.2) and GMGN's later
+            # row for the same trade differ in rounding, and must stay one event.
             known = {
                 tuple(x)
                 for x in (
                     await s.execute(
-                        select(Trade.tx_hash, Trade.mint, Trade.side, Trade.token_amount).where(
+                        select(Trade.tx_hash, Trade.mint, Trade.side).where(
                             Trade.wallet == ctx.address, Trade.tx_hash.in_({v["tx_hash"] for v in values})
                         )
                     )
                 ).all()
             }
-            values = [v for v in values if (v["tx_hash"], v["mint"], v["side"], v["token_amount"]) not in known]
+            values = [v for v in values if (v["tx_hash"], v["mint"], v["side"]) not in known]
             if not values:
                 return []
             stmt = (
@@ -159,6 +161,21 @@ class FeedStore:
             rows = [trade_dict(t) for t in (await s.execute(q)).scalars()]
         cursor = rows[-1]["seq"] if len(rows) >= limit else max(hi, after)
         return rows, cursor
+
+    async def recent_sol_usd(self, window_min: int) -> float | None:
+        """SOL/USD implied by GMGN's own recent trades (usd_amount / sol_amount), median over the window."""
+        async with self._sessions() as s:
+            q = (
+                select(func.percentile_cont(0.5).within_group(Trade.usd_amount / Trade.sol_amount))
+                .where(
+                    Trade.seen_at >= func.now() - text(f"interval '{int(window_min)} minutes'"),
+                    Trade.sol_amount > 0,
+                    Trade.usd_amount > 0,
+                    func.coalesce(Trade.payload["source"].astext, "gmgn") != "chain",
+                )
+            )
+            v = (await s.execute(q)).scalar_one()
+            return float(v) if v else None
 
     async def last_seq(self) -> int:
         async with self._sessions() as s:

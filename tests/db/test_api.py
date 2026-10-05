@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 
@@ -124,6 +126,47 @@ async def test_token_intel_all_parts(client):
     assert set(d2) == {"mint", "security", "dev", "errors"} and r2.json()["meta"]["cached"] is True
     r3 = await client.get(f"/v1/token/{MINT}", headers=H, params={"parts": "nope"})
     assert r3.status_code == 400
+
+
+async def test_chain_fallback_event_then_gmgn_duplicate_skipped(client):
+    from gzetryn.gmgn.parse import TradeRow
+    from gzetryn.jobs.chain_fallback import Job
+    from tests.conftest import load_fixture
+
+    rt = client.rt
+    case = load_fixture("chain-tx.json")[1]
+    g, res = case["gmgn"], case["rpc"]["result"]
+    await client.post("/v1/wallets", headers=H, json={"address": g["wallet"]})
+    await rt.watcher.reload()
+    # the fixture trade is older than this test's activation → pretend the wallet was active before it
+    rt.watcher._ctx[g["wallet"]].watch_started_at = datetime(2026, 1, 1, tzinfo=UTC)
+
+    async def fake_get_tx(sig):
+        return res
+
+    rt.chain._get_tx = fake_get_tx
+    # routing: with the vas group cooling, a notification goes to the chain fallback
+    rt.budget.throttle("vas")
+    assert not rt.budget.is_open("vas")
+    rt.watcher.on_trade(g["wallet"], g["tx_hash"], 1)
+    assert rt.watcher.stats.chain_routed == 1 and rt.chain.summary()["queue"] == 1
+    await rt.chain._process(Job(g["wallet"], g["tx_hash"], rt.clock.monotonic(), rt.clock.now().isoformat()))
+    s = rt.chain.summary()
+    assert s["decoded"] == 1 and s["events"] == 1
+    r = await client.get("/v1/feed", headers=H, params={"after": 0})
+    ev = r.json()["data"]
+    assert len(ev) == 1 and ev[0]["payload"]["source"] == "chain" and ev[0]["side"] == g["side"]
+    assert ev[0]["tx_hash"] == g["tx_hash"] and ev[0]["sol_amount"] > 0
+    # GMGN's row for the same trade (rounded amount) arrives later: not a second event
+    ctx = rt.watcher.context_of(g["wallet"])
+    gm = TradeRow(
+        wallet=g["wallet"], tx_hash=g["tx_hash"], trade_at=datetime.now(UTC),
+        side=g["side"], mint=g["mint"], symbol="X", token_amount=round(g["token_amount"]), sol_amount=g["sol_amount"],
+        quote_symbol="SOL", usd_amount=1.0, price_usd=1.0, price_sol=1.0, total_supply=1.0, mcap_usd=1.0,
+        open_or_close=None, launchpad=None, launchpad_platform=None, payload={"source": "trigger"},
+    )
+    assert await rt.feed.insert(ctx, [gm], rt.clock.now()) == []
+    assert len((await client.get("/v1/feed", headers=H, params={"after": 0})).json()["data"]) == 1
 
 
 async def test_candidates_cursor_no_duplicates(client):

@@ -238,10 +238,47 @@ transacted, and GMGN is polled only then.
   notification to GMGN index, timeouts, caps, coverage (notified / filtered
   / not notified) and live lag p50/p90 per source.
 
+### 6.2 Chain fallback (2026-10-05)
+
+Measured: once Cloudflare challenges GMGN's `/vas/` group (wallet_activity),
+it stays challenged for tens of minutes regardless of our rate (still
+blocked after 17 min without a single request; 06:54 → past 07:50 UTC with
+two brief openings; throttled at 1 request in 10 s / 2 in 60 s). During
+such a block the GMGN-based feed cannot deliver.
+
+- While `/vas/` is not open (cooling or awaiting its probe), or when a
+  triggered GMGN poll fails, a swap-like notification is decoded from the
+  transaction itself: `getTransaction` (jsonParsed,
+  `maxSupportedTransactionVersion: 1` — version 1 transactions are live) on
+  the free public RPC `https://api.mainnet-beta.solana.com`, paced ≥ 2 s
+  apart (it returned 429 after ~16 calls in 8 s; 1 per 2.5 s ran clean;
+  latency p50 0.06 s), 30 s back-off on 429, 3 tries while the RPC has not
+  indexed the transaction, dropped after 120 s.
+- Decoding (pure, `trigger/chain.py`): the wallet's token balance deltas
+  by mint (owner = wallet) and its SOL + wSOL delta with the network fee
+  removed. Exactly one non-SOL mint with the opposite SOL leg = a trade
+  (buy: tokens up, SOL down); anything else (transfers, token↔token
+  routes) is left to GMGN. Verified on 10 GMGN events: side and token
+  amount equal to rounding, SOL amount 0.4–2.2 % off (the chain value is
+  what the wallet really paid/received, fees and tips included).
+- Enrichment without `/vas/`: symbol and total supply from
+  `mutil_window_token_info` (`/api/`, cached); SOL/USD = median of
+  `usd_amount / sol_amount` over GMGN trades in the feed (30 min, else 24 h);
+  `price_sol = sol / tokens`, `price_usd`, `usd_amount`, `mcap_usd` derived.
+  `open_or_close` and launchpad are null.
+- Event `payload.source = chain` (+ `sol_usd`, `sol_includes_fees`,
+  `decode_delay_sec`). Identity for de-duplication is `(wallet, tx_hash,
+  mint, side)`: when `/vas/` reopens, GMGN's row for the same trade is
+  recognised and not stored a second time.
+- Cost: one RPC call per swap-like notification while `/vas/` is down
+  (≈ 1.3/min on average over 49 h); no GMGN `/vas/` call.
+
 ### Events
 
-- Identity: `(wallet, tx_hash, mint, side, token_amount)`; inserts are
-  idempotent, so overlapping pages never duplicate.
+- Identity: `(wallet, tx_hash, mint, side)` for de-duplication before
+  insert (since 2026-10-05, so a chain-decoded event and GMGN's rounded row
+  stay one event); the table's unique key also includes `token_amount`.
+  Inserts are idempotent, so overlapping pages never duplicate.
 - Each event gets a monotonic `seq` (bigserial). Inserting transactions
   hold one advisory lock, so `seq` values **commit in order**; a reader
   following the cursor never skips an event.

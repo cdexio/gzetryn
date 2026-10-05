@@ -120,6 +120,14 @@ class Budget:
             left = max(left, self._groups[group].cooling_until - now) if group in self._groups else left
         return left
 
+    def is_open(self, group: str) -> bool:
+        """The group serves requests normally: not cooling, not waiting for a probe, no global pause."""
+        now = self._clock.monotonic()
+        g = self._groups.get(group)
+        if now < self._global_paused_until:
+            return False
+        return g is None or (now >= g.cooling_until and not g.probing)
+
     def cooling(self) -> dict[str, float]:
         now = self._clock.monotonic()
         return {n: round(g.cooling_until - now, 1) for n, g in self._groups.items() if g.cooling_until > now}
