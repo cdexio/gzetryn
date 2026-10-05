@@ -215,7 +215,10 @@ transacted, and GMGN is polled only then.
   trade with that signature is counted as a classifier miss.
 - Swap-like for wallet W → GMGN `wallet_activity` poll of W after
   `trigger.debounce_sec` = 1 s; if the signature is not in GMGN's page yet,
-  retry after 2, 4, 8, 16 s, giving up after `max_wait_sec` = 30 s. One
+  retry after 2 and 4 s, giving up after `max_wait_sec` = 10 s (was 2, 4,
+  8, 16 s / 30 s until 2026-10-05: 95.4 % of trigger events had lag ≤ 5 s,
+  while the late retries were mostly wasted on 1,453 timed-out triggers and
+  doubled bursts on the challenged `/vas/` group). One
   poll serves every pending signature of the wallet. Per wallet ≥
   `min_gap_sec` = 2 s between triggered polls and ≤ `max_polls_per_min` =
   10; above the cap the trade is left to fallback polling.
@@ -276,18 +279,57 @@ calls (TTL per call `[TUNABLE]`):
 | Part | GMGN calls | TTL |
 |---|---|---|
 | `info` (symbol, supply, pool, price + changes, volume/swaps by window, mcap, liquidity, creation/open/migration times) | POST `mutil_window_token_info` | 30 s |
-| `launchpad` (creator address, platform, status, bonding progress, migration mcap, ATH price) | POST `mrwapi/v1/multi_token_info` (its `creator_address` is filled even when `token_dev_info` blanks it) | 30 s |
-| `security` (mint/freeze authority renounced, top 10 rate, burn, taxes, lock, alert) | `token_security_sol` | 120 s |
-| `dev` (creator, balance, status hold/close/sell, fund source, twitter renames, dexscreener flags) | `token_dev_info` | 60 s |
-| `dev_history` (tokens created, migrated vs never migrated, open ratio, ATH token, recent tokens) | `dev_created_tokens/{creator}` | 600 s |
-| `holders` (rates: top 10, creator, dev team, snipers, fresh, bots, bundlers, insiders, bluechip; counts by tag among holders and among traders) | `token_stat`, `token_holder_stat`, `token_trader_stat` | 45 s |
-| `smart_traders` (KOL and smart wallets that traded it: buy/sell USD and counts, holding %, profit, first/last time; joined with our directory names) | `token_traders?tag=renowned`, `?tag=smart_degen` | 45 s |
+| `launchpad` (creator address, platform, status, bonding progress, migration mcap, ATH price) | POST `mrwapi/v1/multi_token_info` (its `creator_address` is filled even when `token_dev_info` blanks it) | 60 s |
+| `security` (mint/freeze authority renounced, top 10 rate, burn, taxes, lock, alert) | `token_security_sol` | 600 s |
+| `dev` (creator, balance, status hold/close/sell, fund source, twitter renames, dexscreener flags) | `token_dev_info` | 300 s |
+| `dev_history` (tokens created, migrated vs never migrated, open ratio, ATH token, recent tokens) | `dev_created_tokens/{creator}` | 1800 s |
+| `holders` (rates: top 10, creator, dev team, snipers, fresh, bots, bundlers, insiders, bluechip; counts by tag among holders and among traders) | `token_stat`, `token_holder_stat`, `token_trader_stat` | 120 s |
+| `smart_traders` (KOL and smart wallets that traded it: buy/sell USD and counts, holding %, profit, first/last time; joined with our directory names) | `token_traders?tag=renowned`, `?tag=smart_degen` | 120 s |
 | `feed` (our own events for the mint, newest first, plus a per-wallet summary) | none | live |
 
-Default `parts` = all (≤ 10 GMGN calls on a cold cache, P0). A failing
+TTLs raised 2026-10-05 for the engine's enricher (≈ 200–300 Migration
+survivors/day, repeated calls within minutes served from the cache).
+Expected extra load with `parts=security,launchpad,dev,dev_history,holders,smart_traders`:
+9 GMGN calls per cold token (4 on `/vas/`) → ≈ 2,250–2,700 calls/day ≈
+**1.6–1.9 req/min** on average (≈ 0.7–0.8/min on `/vas/`), paced per group.
+
+Default `parts` = all (≤ 10 GMGN calls on a cold cache, P1 — below the
+trigger's P0). A failing
 part is returned as `errors.{part}` while the rest is served; the call
 fails (503) only when every GMGN part fails. `max_age_sec` lowers the
 accepted cache age.
+
+### 7.1 Market candidates (owner-approved 2026-10-05: engine candidate source)
+
+A background job (P3) polls three GMGN lists into the `candidates` table;
+the engine reads it with a cursor, so its polling costs no GMGN calls and
+never returns a candidate twice per kind.
+
+| Kind | GMGN source (verified 2026-10-05) | Every `[TUNABLE]` |
+|---|---|---|
+| `new` | pump.fun `new_creation` (POST `/vas/api/v1/rank/sol`, 50) and non-pump_amm rows of `/api/v1/pairs/sol/new_pairs/1m` (50) | 30 s |
+| `completing` | pump.fun `pump` list (bonding progress ≈ 0.9–1.0) | 30 s |
+| `migrated` | pump.fun `completed` list (pool = AMM pool, `exchange` pump_amm), and `pump_amm` rows of new pairs | 30 s |
+| `trending` | `/defi/quotation/v1/rank/sol/swaps/1h` (50) | 60 s |
+
+- One row per (kind, mint); `seq` is assigned at the first sighting only.
+  Later sightings update `last` (metrics), `last_seen_at`, `seen_count`,
+  and fill a missing pool or completion time.
+- Pool address: pump rows carry `pool_address` (bonding curve while
+  new/completing, AMM pool after migration); new-pair rows carry it as
+  `address`; **trending rows have none** — the job resolves it for new
+  trending mints with POST `mutil_window_token_info` (≤ 5 mints per call;
+  20 is refused with `40000300`), matched by address, before storing.
+- Normalized metrics, frozen at the first sighting in `first` and updated
+  in `last`: price_usd, liquidity_usd, mcap_usd (GMGN market cap = price ×
+  total supply = FDV), holders, volume_1h_usd, buys_1h, sells_1h, swaps_1h,
+  smart_degen_count, renowned_count (KOL), sniper_count,
+  top_10_holder_rate, progress (bonding curve). Fields a source does not
+  carry are null (new pairs: no buy/sell counts or tag counts).
+- Load: pump lists 2/min (`/vas/`), new pairs 2/min (`/api/`), trending
+  1/min (`/defi/`), pool resolution ≤ 4 calls/min (`/api/`). Retention 7
+  days after the last sighting.
+- `GET /v1/market/candidates?kind=&after=&limit=&wait=` (section 11).
 
 ## 8. Leaderboards and "who to copy"
 
@@ -315,7 +357,8 @@ accepted cache age.
 | `curation_runs` | `at`, parameters, candidates, passed, selected (address, rank, metrics), added, removed, skipped reason |
 | `trades` | the feed (section 6) |
 | `request_log` | hourly buckets: consumer, endpoint, outcome, count, latency sum |
-| `samples` | raw answers on unknown errors (7 days) |
+| `samples` | raw answers on unknown errors and throttles (with the group's window counts) (7 days) |
+| `candidates` | market candidates (section 7.1): kind, mint, seq, pool, exchange, launchpad, creator, created/open/complete times, `first`/`last` metrics (7 days after last sighting) |
 
 Retention `[TUNABLE]`: `rank_snapshots` 180 days, `request_log` 30 days,
 `samples` 7 days; trades, wallets and curation runs are kept. Volume:
@@ -323,22 +366,46 @@ Retention `[TUNABLE]`: `rank_snapshots` 180 days, `request_log` 30 days,
 
 ## 10. Budget, pacing and errors
 
-- **Budget**: token bucket, `budget.per_minute` = 60 (cap; half the
-  120/min that ran clean in phase 0), capacity `budget.burst` = 15, and
-  `budget.min_gap_sec` = 0.3 between request starts (all `[TUNABLE]`).
-  P0 may take the last token, P1 leaves `reserve_p1` = 8 (so a cold
-  `/v1/token`, 10 calls, is served from the burst), P2 leaves
-  `reserve_p2` = 10. Waits are bounded per priority (P0 20 s, P1 60 s,
-  P2 120 s); a P0 call that cannot be served returns cached data with
-  `stale: true` or `503` + `Retry-After`. (First deploy ran 40/min,
-  burst 8, P1 reserve 2: a cold token call during the watcher's first
-  round waited > 10 s and lost a part — raised the same day.)
+Revised 2026-10-05 from measured throttling (phase 8 report). Facts:
+GMGN's 429s are Cloudflare challenges (`cf-mitigated: challenge`, "Just a
+moment…" HTML) scoped to a **path group**: `/vas/` was challenged for
+~7 min while `/api/` and `/defi/` answered 200 from the same IP. They came
+~0.6/h at an average of only 5–11 req/min and did not track hourly volume,
+so they are set off by short bursts, not by the sustained rate. The old
+policy (one 429 → *everything* paused 120 s doubling to 30 min) turned 30
+throttles into ~7,800 s of total blackout in 49 h.
+
+- **Groups** = first path segment: `vas` (wallet_activity, token
+  holder/trader stats, token_traders, pump lists), `api` (token stat,
+  security, dev info, dev tokens, window info, new pairs), `defi` (wallet
+  rank, swaps rank, walletNew), `mrwapi` (multi_token_info). Each has its
+  own token bucket and minimum gap `[TUNABLE]`: vas 20/min, burst 4,
+  ≥ 1.0 s apart (smooths trigger storms); api 30/min, burst 8, 0.3 s; defi
+  and mrwapi 20/min, burst 6, 0.3 s. A global bucket keeps the overall cap
+  (60/min, burst 15, ≥ 0.25 s).
+- **Per-group cooldown** on a 429/403: 15 s, doubling to 5 min, reset
+  after 15 min clean `[TUNABLE]`. After the cooldown exactly one request
+  probes the group; it reopens when GMGN answers. Other groups keep
+  working. A **global** pause (60 s) happens only when 2+ groups are
+  cooling at the same time.
+- **Priorities, strict inside a group**: P0 trigger polls (the real-time
+  feed), P1 API calls (engine: token enricher, market, stats), P2 interval
+  polls, P3 background (ranks, wallet metrics, candidate lists). A lower
+  priority never takes a group token while a higher one waits there;
+  reserves: P2 leaves 1 token, P3 leaves 2. Wait limits P0 20 s, P1 30 s,
+  P2 60 s, P3 120 s; a call that cannot be served returns cached data with
+  `stale: true` or `503 {reason: cooldown:<group> | budget | throttled}`
+  + `Retry-After`. Trigger polls also have their own concurrency slots.
+- **Measuring what GMGN tolerates**: per group, request starts in the last
+  10/60/300 s now, their peaks since start, and the counts just before
+  each throttle (also written to the throttle sample) — in `/v1/stats`
+  `budget.groups`.
 - **Classification** (phase 0 codes):
 
 | Answer | Action |
 |---|---|
 | 200 + `code 0` | ok, cached |
-| 429, or 403 Cloudflare HTML | throttled: whole IP paused 120 s, doubling to 30 min, reset after 30 min clean; counted; health degraded |
+| 429, or 403 Cloudflare HTML (`cf-mitigated: challenge`) | throttled: that group cools (15 s → 5 min), probe afterwards; global 60 s pause only if 2+ groups cool; sample stored with the window counts; health degraded |
 | 200 + `code 40000300` / other 4xx JSON | bad parameter → 400 to the caller, no pause |
 | 401 `40101611` | needs login → logged as a bug (no endpoint in use needs it) |
 | 404 | not found → 404 / part error |
@@ -372,6 +439,7 @@ retry_after_sec?}}` with 400 / 404 / 409 / 503.
 | `GET /v1/token/{mint}?parts=&max_age_sec=` | section 7 |
 | `GET /v1/leaderboard?...`, `GET /v1/leaderboard/copy` | section 8 |
 | `GET /v1/curation`, `GET /v1/curation/runs?limit=` | current rule, latest run, history |
+| `GET /v1/market/candidates?kind=new,completing,migrated,trending&after=<seq>&limit=&wait=` | normalized candidates (section 7.1), cursor, no GMGN call |
 | `GET /v1/market/trending?interval=1m\|5m\|1h\|6h\|24h&limit=` | swaps rank (cached 20 s) |
 | `GET /v1/market/new-pairs?interval=&limit=` | new pairs (cached 20 s) |
 | `GET /v1/market/pump?limit=` | pump.fun new / completing / completed (cached 20 s) |
@@ -420,6 +488,7 @@ measured; the soak report records what was observed.
 | 5 — Token intel + API | token endpoint, leaderboards, market lists, stats, contract | all endpoints answer; contract + OpenAPI written |
 | 6 — Deploy + verify | setup, deploy, service, soak check | service active, checks in section 13 of the report pass |
 | 7 — On-chain trigger | verify free WS, trigger module, watcher integration, stats, contract | end-to-end lag measured; GMGN rate and reconnects reported |
+| 8 — Throttling + engine sources | per-group budget/cooldown, strict priority, window measurement; candidates table + endpoint; enricher TTLs | before/after throttles, pause time and lag measured; candidate and enricher fields documented from live rows |
 
 ## 16. Risks
 

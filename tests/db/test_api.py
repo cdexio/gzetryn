@@ -126,6 +126,26 @@ async def test_token_intel_all_parts(client):
     assert r3.status_code == 400
 
 
+async def test_candidates_cursor_no_duplicates(client):
+    rt = client.rt
+    assert await rt.candidates.pump() == 6
+    assert await rt.candidates.new_pairs() == 3
+    n_tr = await rt.candidates.trending()
+    # the fake answers every pool lookup with the PUDU window-info fixture: only PUDU (trending #1) gets a pool
+    assert n_tr == 3 and rt.candidates.pools_resolved + rt.candidates.pools_missing == 3
+    assert await rt.candidates.pump() == 0  # second sighting: no new seq
+    r = await client.get("/v1/market/candidates", headers=H, params={"kind": "migrated"})
+    rows = r.json()["data"]
+    assert [x["kind"] for x in rows] == ["migrated", "migrated"] and rows[0]["pool_address"]
+    assert rows[0]["seen_count"] == 2 and rows[0]["first"]["smart_degen_count"] == 17
+    cur = r.json()["next_cursor"]
+    r2 = await client.get("/v1/market/candidates", headers=H, params={"kind": "migrated", "after": cur})
+    assert r2.json()["data"] == [] and r2.json()["next_cursor"] == cur
+    allr = (await client.get("/v1/market/candidates", headers=H)).json()["data"]
+    assert len(allr) == 12 and [x["seq"] for x in allr] == sorted(x["seq"] for x in allr)
+    assert (await client.get("/v1/market/candidates", headers=H, params={"kind": "bogus"})).status_code == 400
+
+
 async def test_market_and_stats(client):
     r = await client.get("/v1/market/pump", headers=H)
     assert set(r.json()["data"]) == {"new", "completing", "completed"}

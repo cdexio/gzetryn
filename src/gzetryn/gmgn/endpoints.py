@@ -18,6 +18,16 @@ class Endpoint:
     def url(self, **path_params: str) -> str:
         return BASE + self.path.format(chain=CHAIN, **path_params)
 
+    @property
+    def group(self) -> str:
+        return group_of(self.path)
+
+
+def group_of(path: str) -> str:
+    """Cloudflare rate-limit group = first path segment: /vas/… → vas, /api/… → api, /defi/… → defi, /mrwapi/… →
+    mrwapi (2026-10-05: /vas/ challenged while /api/ and /defi/ answered 200)."""
+    return path.lstrip("/").split("/", 1)[0] or "other"
+
 
 RANK_WALLETS = Endpoint("rank_wallets", "/defi/quotation/v1/rank/{chain}/wallets/{period}", fixed={"direction": "desc"})
 WALLET_ACTIVITY = Endpoint(

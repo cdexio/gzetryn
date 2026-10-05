@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,7 +11,7 @@ from typing import Any, Protocol
 
 from gzetryn.clock import Clock
 from gzetryn.config import Tunables
-from gzetryn.gateway.budget import Budget
+from gzetryn.gateway.budget import Budget, Denied
 from gzetryn.gateway.cache import TtlCache, cache_key
 from gzetryn.gmgn import answer as A
 from gzetryn.gmgn.endpoints import Endpoint
@@ -111,7 +112,7 @@ class Gateway:
         path: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
         body: dict | None = None,
-        priority: str = "P1",
+        priority: str = "P2",
         consumer: str = "gzetryn",
         max_age_sec: float | None = None,
     ) -> Result:
@@ -153,9 +154,13 @@ class Gateway:
         cacheable: bool,
     ) -> Result:
         reason, retry_after = "unavailable", 30.0
+        group = endpoint.group
         for attempt in range(2):
-            if not await self._budget.acquire(priority):
-                reason, retry_after = "budget", max(self._budget.paused_for(), 5.0)
+            try:
+                await self._budget.take(priority, group)
+            except Denied as d:
+                self.counts[(consumer, endpoint.name, "denied")] += 1
+                reason, retry_after = d.reason, d.retry_after
                 break
             raw = await self._transport.request(endpoint, path, params, body)
             v = A.classify(raw)
@@ -164,18 +169,30 @@ class Gateway:
             self.latency_ms[ck] += raw.latency_ms
             now = self._clock.now()
             if v.outcome == A.OK:
+                self._budget.ok(group)
                 self.last_ok_at = now
                 if cacheable:
                     self._cache.put(key, raw.body, now)
                 return Result(raw.body, now)
             self.last_error = f"{endpoint.name}: {v.outcome} {v.code or ''} {v.message or ''}".strip()
             if v.outcome == A.THROTTLED:
-                pause = self._budget.throttle()
+                pause = self._budget.throttle(group)
+                windows = self._budget.report()[group]["last_throttle_windows"]
                 self.last_throttle_at = now
-                log.warning("gmgn throttled", extra=fields(endpoint=endpoint.name, status=raw.status, pause_sec=pause))
-                await self._hooks.sample(endpoint.name, raw.status, v.outcome, raw.text_head or None)
-                reason, retry_after = "throttled", pause
+                log.warning(
+                    "gmgn throttled",
+                    extra=fields(
+                        endpoint=endpoint.name, group=group, status=raw.status, cooldown_sec=pause, windows=windows
+                    ),
+                )
+                head = json.dumps({"group": group, "cooldown_sec": pause, "requests_in_window_sec": windows})
+                await self._hooks.sample(endpoint.name, raw.status, v.outcome, head + " " + (raw.text_head or "")[:200])
+                reason, retry_after = f"cooldown:{group}", pause
                 break
+            if v.outcome in A.RETRYABLE:
+                self._budget.released(group)  # no verdict on throttling: free a probe slot
+            else:
+                self._budget.ok(group)  # GMGN itself answered: the group is not challenged
             if v.outcome == A.BAD_PARAM:
                 raise BadRequest(f"GMGN refused the parameters ({v.code}: {v.message})")
             if v.outcome == A.NOT_FOUND:
@@ -212,8 +229,6 @@ class Gateway:
 
 
 def _sample_text(raw: A.RawAnswer) -> str | None:
-    import json
-
     if raw.body is not None:
         try:
             return json.dumps(raw.body, ensure_ascii=False, default=str)[:4000]

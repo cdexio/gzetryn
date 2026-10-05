@@ -43,6 +43,7 @@ class Backend:
     status: Any  # RuntimeStatus: async health(), async stats()
     t: Tunables
     clock: Any
+    candidates: Any = None  # CandidateStore
 
 
 class ApiError(Exception):
@@ -202,7 +203,7 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
     @app.get("/v1/wallets/{address}/stats", tags=["directory"])
     async def wallet_stats(svc: Svc, c: Consumer, address: Address, max_age_sec: MaxAge = None):
         r = await svc.gateway.call(
-            E.WALLET_NEW, path={"address": address}, priority="P0", consumer=c, max_age_sec=max_age_sec
+            E.WALLET_NEW, path={"address": address}, priority="P1", consumer=c, max_age_sec=max_age_sec
         )
         row = parse.wallet_new(r.body, address)
         if row is None:
@@ -323,6 +324,29 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
 
     # ---------- market lists ----------
 
+    @app.get("/v1/market/candidates", tags=["market"])
+    async def market_candidates(
+        svc: Svc,
+        _: Consumer,
+        kind: Annotated[
+            str | None, Query(description="comma list of new,completing,migrated,trending (default: all)")
+        ] = None,
+        after: Annotated[int, Query(ge=0, description="last seq already consumed (0 = from the start)")] = 0,
+        limit: Limit = 500,
+        wait: Annotated[float, Query(ge=0, le=30, description="long-poll seconds when nothing is new")] = 0,
+    ):
+        kinds = [k.strip() for k in kind.split(",") if k.strip()] if kind else None
+        allowed = {"new", "completing", "migrated", "trending"}
+        if kinds and set(kinds) - allowed:
+            raise ApiError(400, "invalid_parameter", f"kind must be among {','.join(sorted(allowed))}")
+        deadline = time.monotonic() + min(wait, svc.t.api.feed_max_wait_sec)
+        while True:
+            rows, cursor = await svc.candidates.read(after, kinds, _limit(svc, limit))
+            if rows or time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(1.0)
+        return _envelope(rows, _meta(last_seq=await svc.candidates.last_seq()), next_cursor=str(cursor))
+
     @app.get("/v1/market/trending", tags=["market"])
     async def trending(
         svc: Svc,
@@ -335,7 +359,7 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
             E.RANK_SWAPS,
             path={"interval": interval},
             params={"limit": limit},
-            priority="P0",
+            priority="P1",
             consumer=c,
             max_age_sec=max_age_sec,
         )
@@ -353,7 +377,7 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
             E.NEW_PAIRS,
             path={"interval": interval},
             params={"limit": limit},
-            priority="P0",
+            priority="P1",
             consumer=c,
             max_age_sec=max_age_sec,
         )
@@ -364,7 +388,7 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
         svc: Svc, c: Consumer, limit: Annotated[int, Query(ge=1, le=100)] = 30, max_age_sec: MaxAge = None
     ):
         r = await svc.gateway.call(
-            E.PUMP_LISTS, body=E.pump_lists_body(limit), priority="P0", consumer=c, max_age_sec=max_age_sec
+            E.PUMP_LISTS, body=E.pump_lists_body(limit), priority="P1", consumer=c, max_age_sec=max_age_sec
         )
         return _envelope(parse.pump_lists(r.body), _meta(r, source="vas/rank (Pump.fun)"))
 

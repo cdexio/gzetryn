@@ -106,13 +106,12 @@ def test_trigger_resolve_hit_retry_timeout():
     w._resolve(WALLET, {"a"}, clock.monotonic())  # a indexed, b not yet → retry in 2 s
     assert w.stats.trigger_hits == 1 and list(w._pending[WALLET]) == ["b"]
     assert w._trig_due[WALLET] == pytest.approx(clock.monotonic() + 2.0)
-    for delay in (4.0, 8.0, 16.0):
-        clock.advance(1)
-        w._trig_due.clear()
-        w._resolve(WALLET, set(), clock.monotonic())
-        assert w._trig_due[WALLET] == pytest.approx(clock.monotonic() + delay)
-    clock.advance(30)
-    w._resolve(WALLET, set(), clock.monotonic())  # past max_wait → dropped
+    clock.advance(1)
+    w._trig_due.clear()
+    w._resolve(WALLET, set(), clock.monotonic())  # second retry in 4 s (ladder 2, 4 since 2026-10-05)
+    assert w._trig_due[WALLET] == pytest.approx(clock.monotonic() + 4.0)
+    clock.advance(10)
+    w._resolve(WALLET, set(), clock.monotonic())  # past max_wait (10 s) → dropped
     assert WALLET not in w._pending and w.stats.trigger_timeouts == 1
     assert list(w.stats.hit_after_sec) == [pytest.approx(1.5)]
 

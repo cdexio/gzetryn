@@ -1308,6 +1308,111 @@
     }
    }
   },
+  "/v1/market/candidates": {
+   "get": {
+    "tags": [
+     "market"
+    ],
+    "summary": "Market Candidates",
+    "operationId": "market_candidates_v1_market_candidates_get",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "comma list of new,completing,migrated,trending (default: all)",
+       "title": "Kind"
+      },
+      "description": "comma list of new,completing,migrated,trending (default: all)"
+     },
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "last seq already consumed (0 = from the start)",
+       "default": 0,
+       "title": "After"
+      },
+      "description": "last seq already consumed (0 = from the start)"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "capped by the server's max_limit",
+       "default": 500,
+       "title": "Limit"
+      },
+      "description": "capped by the server's max_limit"
+     },
+     {
+      "name": "wait",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "number",
+       "maximum": 30,
+       "minimum": 0,
+       "description": "long-poll seconds when nothing is new",
+       "default": 0,
+       "title": "Wait"
+      },
+      "description": "long-poll seconds when nothing is new"
+     },
+     {
+      "name": "x-consumer",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Consumer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/market/trending": {
    "get": {
     "tags": [

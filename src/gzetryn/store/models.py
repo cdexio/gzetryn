@@ -171,6 +171,38 @@ class Trade(Base):
     payload: Mapped[dict | None] = mapped_column(JSONB)
 
 
+class Candidate(Base):
+    """Normalized market candidates (spec §7.1): one row per (kind, mint), seq assigned at first sighting only."""
+
+    __tablename__ = "candidates"
+    __table_args__ = (
+        UniqueConstraint("kind", "mint", name="uq_candidates_kind_mint"),
+        Index("ix_candidates_kind_seq", "kind", "seq"),
+        Index("ix_candidates_first_seen", "first_seen_at"),
+    )
+
+    seq: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    mint: Mapped[str] = mapped_column(ADDR)
+    source: Mapped[str] = mapped_column(String(16))
+    first_seen_at: Mapped[datetime] = mapped_column(TS)
+    last_seen_at: Mapped[datetime] = mapped_column(TS)
+    seen_count: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    symbol: Mapped[str | None] = mapped_column(String(64))
+    name: Mapped[str | None] = mapped_column(String(128))
+    pool_address: Mapped[str | None] = mapped_column(ADDR)
+    exchange: Mapped[str | None] = mapped_column(String(32))
+    launchpad: Mapped[str | None] = mapped_column(String(32))
+    launchpad_platform: Mapped[str | None] = mapped_column(String(32))
+    quote_address: Mapped[str | None] = mapped_column(ADDR)
+    creator: Mapped[str | None] = mapped_column(ADDR)
+    created_at: Mapped[datetime | None] = mapped_column(TS)
+    open_at: Mapped[datetime | None] = mapped_column(TS)
+    complete_at: Mapped[datetime | None] = mapped_column(TS)
+    first: Mapped[dict] = mapped_column(JSONB)  # metrics at first sighting (frozen)
+    last: Mapped[dict] = mapped_column(JSONB)  # metrics at the latest sighting
+
+
 class RequestLog(Base):
     __tablename__ = "request_log"
     __table_args__ = (

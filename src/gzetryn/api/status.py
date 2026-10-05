@@ -47,17 +47,22 @@ class RuntimeStatus:
 
         g = rt.gateway
         paused = rt.budget.paused_for()
+        cooling = rt.budget.cooling()
         gm = {
             "status": "ok",
-            "paused_sec": round(paused, 1),
+            "global_paused_sec": round(paused, 1),
+            "cooling_groups": cooling,  # {group: seconds left}
             "throttles": rt.budget.throttles,
+            "global_pauses": rt.budget.global_pauses,
             "tokens": round(rt.budget.tokens, 2),
             "last_ok_at": _iso(g.last_ok_at),
             "last_throttle_at": _iso(g.last_throttle_at),
             "last_error": g.last_error,
         }
         if paused > 0:
-            gm.update(status="degraded", reason="throttled by GMGN; paused")
+            gm.update(status="degraded", reason="several GMGN groups throttled; all paused briefly")
+        elif cooling:
+            gm.update(status="degraded", reason="GMGN group(s) cooling after a 429: " + ",".join(sorted(cooling)))
         elif up > 600 and (g.last_ok_at is None or (now - g.last_ok_at).total_seconds() > 900):
             gm.update(status="degraded", reason="no ok GMGN answer in 15 min")
         c["gmgn"] = gm
@@ -149,11 +154,16 @@ class RuntimeStatus:
                 "burst": rt.t.budget.burst,
                 "min_gap_sec": rt.t.budget.min_gap_sec,
                 "tokens": round(rt.budget.tokens, 2),
-                "paused_sec": round(rt.budget.paused_for(), 1),
+                "global_paused_sec": round(rt.budget.paused_for(), 1),
+                "global_pauses": rt.budget.global_pauses,
                 "throttles": rt.budget.throttles,
                 "granted": rt.budget.granted,
                 "denied": rt.budget.denied,
+                # per path group: limits, tokens, cooldown, throttles, request counts in the last 10/60/300 s now,
+                # their peaks since start, and the counts right before the last throttle (= what GMGN tolerated)
+                "groups": rt.budget.report(),
             },
+            "candidates": rt.candidates.summary() if rt.candidates is not None else None,
             "cache": {"entries": len(rt.gateway.cache), "hits": rt.gateway.cache.hits, "misses": rt.gateway.cache.misses},
             "directory": rt.directory.summary(),
             "watcher": rt.watcher.summary(),

@@ -23,6 +23,7 @@ def backend_of(rt: Runtime) -> Backend:
         status=RuntimeStatus(rt),
         t=rt.t,
         clock=rt.clock,
+        candidates=rt.candidate_store,
     )
 
 

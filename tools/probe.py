@@ -170,7 +170,11 @@ def cmd_burst(path: str, n: int, gap: float) -> None:
             r = s.get(url, timeout=20, headers=HEADERS)
             counts[f"{r.status_code}:{classify(r.text)}"] += 1
             if r.status_code != 200:
-                print("non-200", r.status_code, dict(r.headers))
+                keep = ("retry-after", "cf-ray", "cf-mitigated", "server", "content-type", "set-cookie", "x-ratelimit")
+                h = {k: v[:80] for k, v in r.headers.items() if any(k.lower().startswith(x) for x in keep)}
+                print(f"{time.strftime('%H:%M:%S')} non-200 {r.status_code} {classify(r.text)} {h}")
+            else:
+                print(f"{time.strftime('%H:%M:%S')} 200")
         except Exception as e:  # noqa: BLE001
             counts[f"ERR:{type(e).__name__}"] += 1
         lat.append(time.time() - t)

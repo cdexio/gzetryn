@@ -28,7 +28,7 @@ class TokenIntel:
         results: list[Result] = []
 
         async def call(ep: E.Endpoint, **kw) -> Any:
-            r = await self._gw.call(ep, priority="P0", consumer=consumer, max_age_sec=max_age_sec, **kw)
+            r = await self._gw.call(ep, priority="P1", consumer=consumer, max_age_sec=max_age_sec, **kw)
             results.append(r)
             return r.body
 

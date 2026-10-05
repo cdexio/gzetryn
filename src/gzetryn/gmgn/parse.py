@@ -529,6 +529,192 @@ def token_traders(body: Any, tag: str) -> Page:
     return pg
 
 
+# ---------- candidates (normalized market rows, phase 8 report) ----------
+
+CANDIDATE_METRICS = (
+    "price_usd",
+    "liquidity_usd",
+    "mcap_usd",
+    "holders",
+    "volume_1h_usd",
+    "buys_1h",
+    "sells_1h",
+    "swaps_1h",
+    "smart_degen_count",
+    "renowned_count",
+    "sniper_count",
+    "top_10_holder_rate",
+    "progress",
+)
+
+
+@dataclass
+class CandidateRow:
+    kind: str  # new | completing | migrated | trending
+    source: str  # pump_lists | new_pairs | rank_swaps
+    mint: str
+    symbol: str | None = None
+    name: str | None = None
+    pool_address: str | None = None
+    exchange: str | None = None
+    launchpad: str | None = None
+    launchpad_platform: str | None = None
+    quote_address: str | None = None
+    creator: str | None = None
+    created_at: datetime | None = None
+    open_at: datetime | None = None
+    complete_at: datetime | None = None
+    metrics: dict = field(default_factory=dict)
+
+
+def _metrics(**kw) -> dict:
+    return {k: kw.get(k) for k in CANDIDATE_METRICS}
+
+
+def candidates_pump(body: Any) -> list[CandidateRow]:
+    """POST /vas/api/v1/rank/sol (Pump.fun): new_creation → new, pump → completing, completed → migrated.
+
+    `pool_address` is the bonding curve for new/completing and the AMM pool for completed (`exchange` pump_amm).
+    """
+    out = []
+    d = _dict(data(body))
+    for key, kind in (("new_creation", "new"), ("pump", "completing"), ("completed", "migrated")):
+        for r in _list(d.get(key)):
+            mint = s(r.get("address")) if isinstance(r, dict) else None
+            if not mint:
+                continue
+            out.append(
+                CandidateRow(
+                    kind=kind,
+                    source="pump_lists",
+                    mint=mint,
+                    symbol=s(r.get("symbol")),
+                    name=s(r.get("name")),
+                    pool_address=s(r.get("pool_address")),
+                    exchange=s(r.get("exchange")),
+                    launchpad=s(r.get("launchpad")),
+                    launchpad_platform=s(r.get("launchpad_platform")),
+                    quote_address=s(r.get("quote_address")),
+                    creator=s(r.get("creator")),
+                    created_at=ts(r.get("created_timestamp")),
+                    open_at=ts(r.get("open_timestamp")),
+                    complete_at=ts(r.get("complete_timestamp")),
+                    metrics=_metrics(
+                        price_usd=None,
+                        liquidity_usd=f(r.get("liquidity")),
+                        mcap_usd=f(r.get("usd_market_cap")) or f(r.get("market_cap")),
+                        holders=i(r.get("holder_count")),
+                        volume_1h_usd=f(r.get("volume_1h")),
+                        buys_1h=i(r.get("buys_1h")),
+                        sells_1h=i(r.get("sells_1h")),
+                        swaps_1h=i(r.get("swaps_1h")),
+                        smart_degen_count=i(r.get("smart_degen_count")),
+                        renowned_count=i(r.get("renowned_count")),
+                        sniper_count=i(r.get("sniper_count")),
+                        top_10_holder_rate=f(r.get("top_10_holder_rate")),
+                        progress=f(r.get("progress")),
+                    ),
+                )
+            )
+    return out
+
+
+def candidates_new_pairs(body: Any) -> list[CandidateRow]:
+    """GET /api/v1/pairs/sol/new_pairs/{interval}: `address` = pool, `base_address` = mint. A new pump_amm pool is a
+    migration (kind migrated), every other new pool is kind new. No buy/sell counts or holder tags in these rows."""
+    out = []
+    for r in _list(_dict(data(body)).get("pairs")):
+        if not isinstance(r, dict):
+            continue
+        b = _dict(r.get("base_token_info"))
+        mint = s(r.get("base_address")) or s(b.get("address"))
+        if not mint:
+            continue
+        exchange = s(r.get("exchange"))
+        bv, sv = f(b.get("buy_volume_1h")), f(b.get("sell_volume_1h"))
+        out.append(
+            CandidateRow(
+                kind="migrated" if exchange == "pump_amm" else "new",
+                source="new_pairs",
+                mint=mint,
+                symbol=s(b.get("symbol")),
+                name=s(b.get("name")),
+                pool_address=s(r.get("address")),
+                exchange=exchange,
+                launchpad=s(r.get("launchpad")),
+                launchpad_platform=s(r.get("launchpad_platform")),
+                quote_address=s(r.get("quote_address")),
+                creator=s(b.get("creator")),
+                created_at=ts(b.get("creation_timestamp")),
+                open_at=ts(r.get("open_timestamp")),
+                metrics=_metrics(
+                    price_usd=f(b.get("price")),
+                    liquidity_usd=f(b.get("liquidity")) or f(r.get("quote_reserve_usd")),
+                    mcap_usd=f(b.get("market_cap")),
+                    holders=i(b.get("holder_count")),
+                    volume_1h_usd=(bv or 0.0) + (sv or 0.0) if bv is not None or sv is not None else None,
+                    progress=f(b.get("progress")),
+                ),
+            )
+        )
+    return out
+
+
+def candidates_trending(body: Any) -> list[CandidateRow]:
+    """GET /defi/quotation/v1/rank/sol/swaps/1h: no pool address in the row (resolved separately)."""
+    out = []
+    for r in _list(_dict(data(body)).get("rank")):
+        mint = s(r.get("address")) if isinstance(r, dict) else None
+        if not mint:
+            continue
+        out.append(
+            CandidateRow(
+                kind="trending",
+                source="rank_swaps",
+                mint=mint,
+                symbol=s(r.get("symbol")),
+                name=s(r.get("name")),
+                exchange=s(r.get("exchange")),
+                launchpad=s(r.get("launchpad")),
+                launchpad_platform=s(r.get("launchpad_platform")),
+                quote_address=s(r.get("launch_quote_address")),
+                creator=s(r.get("creator")),
+                created_at=ts(r.get("creation_timestamp")),
+                open_at=ts(r.get("open_timestamp")),
+                metrics=_metrics(
+                    price_usd=f(r.get("price")),
+                    liquidity_usd=f(r.get("liquidity")),
+                    mcap_usd=f(r.get("market_cap")),
+                    holders=i(r.get("holder_count")),
+                    volume_1h_usd=f(r.get("volume")),
+                    buys_1h=i(r.get("buys")),
+                    sells_1h=i(r.get("sells")),
+                    swaps_1h=i(r.get("swaps")),
+                    smart_degen_count=i(r.get("smart_degen_count")),
+                    renowned_count=i(r.get("renowned_count")),
+                    sniper_count=i(r.get("sniper_count")),
+                    top_10_holder_rate=f(r.get("top_10_holder_rate")),
+                ),
+            )
+        )
+    return out
+
+
+def pools_from_window_info(body: Any) -> dict[str, dict]:
+    """POST mutil_window_token_info with up to 5 mints → {mint: {pool_address, exchange}} (matched by address:
+    GMGN does not keep the request order)."""
+    out = {}
+    for d in _list(data(body)):
+        if not isinstance(d, dict) or not s(d.get("address")):
+            continue
+        pool = _dict(d.get("pool"))
+        out[s(d.get("address"))] = {
+            "pool_address": s(pool.get("pool_address")) or s(d.get("biggest_pool_address")),
+            "exchange": s(pool.get("exchange")),
+        }
+    return out
+
+
 # ---------- market lists (light normalization, GMGN field names kept) ----------
 
 

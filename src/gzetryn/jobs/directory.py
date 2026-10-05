@@ -49,7 +49,7 @@ class Directory:
                         E.RANK_WALLETS,
                         path={"period": period},
                         params={"tag": tag, "orderby": f"pnl_{period}"},
-                        priority="P2",
+                        priority="P3",
                         consumer=consumer,
                         max_age_sec=60,
                     )
@@ -118,11 +118,11 @@ class Directory:
         done = 0
         for address in todo:
             try:
-                r = await self._gw.call(E.WALLET_NEW, path={"address": address}, priority="P2")
+                r = await self._gw.call(E.WALLET_NEW, path={"address": address}, priority="P3")
                 row = parse.wallet_new(r.body, address)
                 ident = None
                 with contextlib.suppress(GatewayError):
-                    c = await self._gw.call(E.WALLET_COMMON_STAT, path={"address": address}, priority="P2")
+                    c = await self._gw.call(E.WALLET_COMMON_STAT, path={"address": address}, priority="P3")
                     ident = parse.wallet_common_stat(c.body)
                 if row is not None:
                     await self._wallets.set_external_metrics(row, ident, self._clock.now())

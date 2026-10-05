@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import random
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -87,6 +87,7 @@ class Watcher:
         self._trig_times: dict[str, deque] = {}
         self._last_trig_poll: dict[str, float] = {}
         self._inflight: dict[str, asyncio.Task] = {}
+        self._source: dict[str, str] = {}  # in-flight wallet → trigger | interval
         self._wake = asyncio.Event()
         self._next_reload = 0.0
         self._started = False
@@ -210,27 +211,31 @@ class Watcher:
                         self._due[addr] = cap
             self._was_healthy = healthy
             for addr, source in self._pick(mono):
+                self._source[addr] = source
                 self._inflight[addr] = asyncio.create_task(self._poll_guarded(addr, source), name=f"poll:{addr[:6]}")
             self._wake.clear()
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._wake.wait(), timeout=self._t.tick_sec)
 
     def _pick(self, mono: float) -> list[tuple[str, str]]:
-        free = self._t.max_concurrent - len(self._inflight)
-        if free <= 0:
-            return []
+        """Trigger polls have their own slots, so interval polls waiting for budget never hold them up."""
         out: list[tuple[str, str]] = []
-        for d, a in sorted((d, a) for a, d in self._trig_due.items() if d <= mono and a not in self._inflight):
-            if len(out) >= free:
+        busy = Counter(self._source.values())
+        free_t = self._tt.max_concurrent - busy["trigger"]
+        for _, a in sorted((d, a) for a, d in self._trig_due.items() if d <= mono and a not in self._inflight):
+            if free_t <= 0:
                 break
             del self._trig_due[a]
             out.append((a, "trigger"))
+            free_t -= 1
         taken = {a for a, _ in out}
+        free_i = self._t.max_concurrent - busy["interval"]
         for _, a in sorted((d, a) for a, d in self._due.items() if d <= mono and a not in self._inflight):
-            if len(out) >= free:
+            if free_i <= 0:
                 break
             if a not in taken:
                 out.append((a, "interval"))
+                free_i -= 1
         return out
 
     async def _poll_guarded(self, addr: str, source: str) -> None:
@@ -243,6 +248,7 @@ class Watcher:
             self._due[addr] = self._clock.monotonic() + self._t.cold_interval_sec
         finally:
             self._inflight.pop(addr, None)
+            self._source.pop(addr, None)
             self._wake.set()
 
     def _context(self, w: Wallet) -> WalletContext:
@@ -303,7 +309,9 @@ class Watcher:
                 params = {"wallet": addr, "limit": self._t.page_limit}
                 if cursor:
                     params["cursor"] = cursor
-                r = await self._gw.call(E.WALLET_ACTIVITY, params=params, priority="P1")
+                # trigger polls are the real-time path: highest priority; interval polls only catch misses
+                prio = "P0" if source == "trigger" else "P2"
+                r = await self._gw.call(E.WALLET_ACTIVITY, params=params, priority=prio)
                 self.stats.pages += 1
                 pg = parse.wallet_activity(r.body, addr)
                 found.update(x.tx_hash for x in pg.items)

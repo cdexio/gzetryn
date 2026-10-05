@@ -10,10 +10,12 @@ from gzetryn.clock import Clock
 from gzetryn.config import Settings, Tunables
 from gzetryn.gateway.budget import Budget
 from gzetryn.gateway.gateway import Gateway
+from gzetryn.jobs.candidates import Candidates
 from gzetryn.jobs.directory import Directory
 from gzetryn.jobs.token import TokenIntel
 from gzetryn.jobs.watcher import Watcher
 from gzetryn.log import fields, get_logger
+from gzetryn.store.candidates import CandidateStore
 from gzetryn.store.db import make_engine, make_sessionmaker
 from gzetryn.store.feed import FeedStore
 from gzetryn.store.ops import OpsStore
@@ -56,6 +58,12 @@ class Runtime:
             self.trigger = WsTrigger(self.t.trigger, self.watcher.on_trade, self.clock)
             self.watcher.trigger = self.trigger
         self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed)
+        self.candidate_store = CandidateStore(self.sessions)
+        self.candidates: Candidates | None = (
+            Candidates(self.t.candidates, self.gateway, self.candidate_store, self.clock)
+            if self.t.candidates.enabled
+            else None
+        )
         self._flushed: Counter = Counter()
         self._flushed_lat: defaultdict = defaultdict(float)
         self._tasks: list[asyncio.Task] = []
@@ -71,6 +79,8 @@ class Runtime:
             self._tasks.append(asyncio.create_task(self.watcher.run(), name="watcher"))
             if self.trigger is not None:
                 self._tasks.append(asyncio.create_task(self.trigger.run(), name="trigger"))
+        if self.candidates is not None:
+            self._tasks.append(asyncio.create_task(self.candidates.run(), name="candidates"))
         self._tasks.append(asyncio.create_task(self._every(60, self._flush_counts), name="counts"))
         self._tasks.append(
             asyncio.create_task(self._every(self.t.retention.interval_sec, self._retention, 900), name="retention")
@@ -98,6 +108,7 @@ class Runtime:
 
     async def _retention(self) -> None:
         removed = await self.ops.retention(self.t.retention, self.clock.now())
+        removed["candidates"] = await self.candidate_store.retention(self.t.candidates.retention_days, self.clock.now())
         log.info("retention", extra=fields(**removed))
 
     async def stop(self) -> None:
@@ -105,6 +116,8 @@ class Runtime:
         self.watcher.stop()
         if self.trigger is not None:
             self.trigger.stop()
+        if self.candidates is not None:
+            self.candidates.stop()
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)

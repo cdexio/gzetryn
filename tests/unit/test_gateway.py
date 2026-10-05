@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from gzetryn.clock import FakeClock
-from gzetryn.config import BudgetTunables, Tunables
+from gzetryn.config import BudgetTunables, GroupTunables, Tunables
 from gzetryn.gateway.budget import Budget
 from gzetryn.gateway.gateway import BadRequest, Gateway, NotFound, Unavailable, UpstreamError
 from gzetryn.gmgn import endpoints as E
@@ -30,45 +30,84 @@ def test_query_pairs_repeat_list_values():
     assert pairs == [("type", "buy"), ("type", "sell"), ("wallet", "W"), ("limit", "20"), ("x", "true")]
 
 
-async def test_budget_reserves_and_min_gap():
+def group_budget(clock, **kw):
+    g = {"vas": GroupTunables(per_minute=60, burst=4, min_gap_sec=0.5), "api": GroupTunables(per_minute=60, burst=4)}
+    return Budget(BudgetTunables(per_minute=600, burst=100, min_gap_sec=0, groups=g, **kw), clock)
+
+
+def test_endpoint_groups():
+    assert E.WALLET_ACTIVITY.group == "vas" and E.TOKEN_HOLDER_STAT.group == "vas" and E.PUMP_LISTS.group == "vas"
+    assert E.TOKEN_STAT.group == "api" and E.NEW_PAIRS.group == "api" and E.TOKEN_WINDOW_INFO.group == "api"
+    assert E.RANK_WALLETS.group == "defi" and E.RANK_SWAPS.group == "defi" and E.TOKEN_MULTI_INFO.group == "mrwapi"
+
+
+async def test_group_reserves_and_min_gap():
     clock = FakeClock()
-    b = Budget(BudgetTunables(per_minute=60, burst=4, min_gap_sec=0.5, reserve_p1=1, reserve_p2=2), clock)
-    assert await b.acquire("P2", 0.0)  # tokens 4 → 3
-    assert not await b.acquire("P2", 0.0)  # min gap not over
+    b = group_budget(clock)  # reserves P2 1, P3 2
+    assert await b.acquire("P3", 0.0, group="vas")  # 4 → 3
+    assert not await b.acquire("P3", 0.0, group="vas")  # min gap 0.5 s not over
     clock.advance(0.5)
-    assert await b.acquire("P2", 0.0)  # 3.5 → 2.5
+    assert await b.acquire("P3", 0.0, group="vas")  # 3.5 → 2.5
     clock.advance(0.5)
-    assert await b.acquire("P2", 0.0)  # 3.0 ≥ 1 + reserve 2 → 2.0
+    assert await b.acquire("P3", 0.0, group="vas")  # 3.0 ≥ 1 + 2 → 2.0
     clock.advance(0.5)
-    assert not await b.acquire("P2", 0.0)  # 2.5 < 3: P2 must leave 2 tokens
-    assert await b.acquire("P1", 0.0)  # P1 needs 2 → 1.5
+    assert not await b.acquire("P3", 0.0, group="vas")  # 2.5 < 3: P3 leaves 2 tokens
+    assert await b.acquire("P2", 0.0, group="vas")  # needs 2 → 1.5
     clock.advance(0.5)
-    assert await b.acquire("P0", 0.0)  # P0 may take the last tokens → 1.0
-    assert b.granted == {"P0": 1, "P1": 1, "P2": 3}
+    assert await b.acquire("P0", 0.0, group="vas")  # P0 may take the last tokens
+    assert await b.acquire("P1", 0.0, group="api")  # other group, own bucket and gap
+    assert b.granted == {"P0": 1, "P1": 1, "P2": 1, "P3": 3}
 
 
-async def test_budget_p0_takes_last_token_and_waits():
+async def test_throttle_cools_one_group_only_then_probe():
     clock = FakeClock()
-    b = Budget(BudgetTunables(per_minute=60, burst=2, min_gap_sec=0, reserve_p1=1, reserve_p2=1), clock)
-    assert await b.acquire("P0", 0)
-    assert await b.acquire("P0", 0)
-    assert not await b.acquire("P1", 0)
-    t0 = clock.monotonic()
-    assert await b.acquire("P0", 5.0)  # waits ~1 s for one token at 1/s
-    assert 0.9 <= clock.monotonic() - t0 <= 1.6
-
-
-async def test_throttle_pause_doubles_and_resets():
-    clock = FakeClock()
-    b = Budget(BudgetTunables(throttle_pause_sec=10, throttle_pause_max_sec=40, throttle_reset_sec=100), clock)
-    assert b.throttle() == 10
-    assert b.throttle() == 20
-    assert b.throttle() == 40
-    assert b.throttle() == 40
+    b = group_budget(clock, cooldown_start_sec=15, cooldown_max_sec=60, cooldown_reset_sec=100)
+    assert b.throttle("vas") == 15
+    assert b.cooling() == {"vas": 15.0} and b.paused_for() == 0
+    assert await b.acquire("P1", 0.0, group="api")  # api unaffected
+    assert not await b.acquire("P0", 5.0, group="vas")  # 15 s cooldown > 5 s wait
+    clock.advance(15)
+    assert await b.acquire("P0", 0.0, group="vas")  # the probe
+    assert not await b.acquire("P0", 0.0, group="vas")  # others wait for the probe's answer
+    b.ok("vas")
+    clock.advance(1)
+    assert await b.acquire("P0", 0.0, group="vas")  # reopened
+    # doubling, cap, reset
+    assert [b.throttle("vas") for _ in range(4)] == [30, 60, 60, 60]
     clock.advance(101)
-    assert b.throttle() == 10
-    assert b.paused_for() == pytest.approx(10)
-    assert not await b.acquire("P0", 5.0)
+    assert b.throttle("vas") == 15
+    assert b.report()["vas"]["throttles"] == 6
+
+
+async def test_global_pause_only_when_two_groups_cool():
+    clock = FakeClock()
+    b = group_budget(clock, global_pause_groups=2, global_pause_sec=60)
+    b.throttle("vas")
+    assert b.paused_for() == 0 and b.global_pauses == 0
+    b.throttle("api")
+    assert b.paused_for() == pytest.approx(60) and b.global_pauses == 1
+    assert not await b.acquire("P0", 5.0, group="defi")
+
+
+async def test_strict_priority_in_group():
+    clock = FakeClock()
+    b = group_budget(clock)
+    g = b._group("vas")
+    g.waiting["P0"] += 1  # a trigger poll is waiting in vas
+    assert not await b.acquire("P1", 0.0, group="vas")
+    assert await b.acquire("P1", 0.0, group="api")  # other group is not blocked
+    g.waiting["P0"] -= 1
+    assert await b.acquire("P1", 0.0, group="vas")
+
+
+async def test_windows_recorded_at_throttle():
+    clock = FakeClock()
+    b = group_budget(clock)
+    for _ in range(3):
+        assert await b.acquire("P0", 5.0, group="vas")
+    b.throttle("vas")
+    r = b.report()["vas"]
+    assert r["last_throttle_windows"] == {10: 3, 60: 3, 300: 3} and r["peak"][10] == 3
 
 
 async def test_cache_hit_and_max_age():
@@ -96,16 +135,22 @@ async def test_coalescing_identical_inflight():
     assert len(tr.calls) == 1 and all(r.body == rs[0].body for r in rs)
 
 
-async def test_throttle_serves_stale_then_unavailable():
+async def test_throttle_serves_stale_cools_group_only():
     gw, tr, clock = make({"rank_wallets": [RawAnswer(200, OK_BODY), RawAnswer(429, None)]})
     await gw.call(E.RANK_WALLETS, path={"period": "7d"})
     clock.advance(1000)
     r = await gw.call(E.RANK_WALLETS, path={"period": "7d"})
+    t_throttle = clock.monotonic()
     assert r.stale and r.cached
-    assert gw.budget.throttles == 1 and gw.budget.paused_for() > 0
+    assert gw.budget.throttles == 1 and gw.budget.cooling() == {"defi": 15.0} and gw.budget.paused_for() == 0
+    s = await gw.call(E.TOKEN_STAT, path={"mint": "M"}, priority="P1")  # api group still served
+    assert not s.cached and clock.monotonic() - t_throttle < 1
+    ok = await gw.call(E.RANK_SWAPS, path={"interval": "1h"}, priority="P3")  # waits out 15 s, then probes
+    assert not ok.stale and clock.monotonic() - t_throttle >= 15 and gw.budget.report()["defi"]["probing"] is False
+    gw.budget.throttle("defi")  # cooling again for 30 s, longer than P0's 20 s wait limit
     with pytest.raises(Unavailable) as e:
-        await gw.call(E.TOKEN_STAT, path={"mint": "M"}, priority="P0")
-    assert e.value.reason == "budget"
+        await gw.call(E.RANK_SWAPS, path={"interval": "5m"}, priority="P0")
+    assert e.value.reason == "cooldown:defi" and e.value.retry_after_sec > 0
 
 
 async def test_bad_param_not_found_needs_login():
