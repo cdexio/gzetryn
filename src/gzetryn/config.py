@@ -54,7 +54,11 @@ class BudgetTunables(BaseModel):
     # the first success. 2026-10-05: /vas/ blocks outlast 300 s (probes at +300 s kept hitting 429) → cap 3600 s
     cooldown_start_sec: float = 15.0
     cooldown_max_sec: float = 3600.0
-    cooldown_reset_sec: float = 900.0  # a throttle after this much clean time (no open ladder) starts again at 15 s
+    # [TUNABLE] after a success the ladder steps down one level per this many clean seconds (no reset to 15 s):
+    # /vas/ was re-challenged 30 s - 20 min after reopenings with the reset-on-success rule (2026-10-05 12:12-13:08)
+    cooldown_decay_sec: float = 900.0
+    reopen_slow_sec: float = 600.0  # [TUNABLE] after a reopen the group runs at reopen_rate_factor this long
+    reopen_rate_factor: float = Field(0.5, gt=0, le=1)  # [TUNABLE] rate and gap factor after a reopen
     # global pause only when this many groups are cooling at the same time
     global_pause_groups: int = 2
     global_pause_sec: float = 60.0

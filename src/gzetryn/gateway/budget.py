@@ -56,7 +56,9 @@ class GroupState:
     last_throttle: float = -1e9
     probing: bool = False
     probe_inflight: bool = False
-    level: int = 0  # consecutive throttles without a success in between
+    level: int = 0  # ladder level: +1 per throttle, -1 per clean cooldown_decay_sec
+    last_decay: float = -1e9
+    reopened_at: float = -1e9  # last probe success (half rate for reopen_slow_sec afterwards)
     waiting: Counter = field(default_factory=Counter)
     starts: deque = field(default_factory=lambda: deque(maxlen=5000))
     throttles: int = 0
@@ -142,7 +144,9 @@ class Budget:
         out = {}
         for n, g in self._groups.items():
             g.bucket.refill(now)
+            self._decay(g, now)
             out[n] = {
+                "slow_after_reopen_sec": round(max(0.0, self._t.reopen_slow_sec - (now - g.reopened_at)), 1),
                 "per_minute": g.t.per_minute,
                 "burst": g.t.burst,
                 "min_gap_sec": g.t.min_gap_sec,
@@ -184,6 +188,7 @@ class Budget:
         try:
             while True:
                 now = self._clock.monotonic()
+                g.bucket.rate = g.t.per_minute / 60.0 * self._rate_factor(g, now)
                 g.bucket.refill(now)
                 self._global.refill(now)
                 blocked_until = max(self._global_paused_until, g.cooling_until)
@@ -209,7 +214,7 @@ class Budget:
                 wait = max(
                     (need - g.bucket.tokens) / g.bucket.rate,
                     (1.0 - self._global.tokens) / self._global.rate,
-                    g.last_start + g.t.min_gap_sec - now,
+                    g.last_start + g.t.min_gap_sec / self._rate_factor(g, now) - now,
                     self._global_last + self._t.min_gap_sec - now,
                     0.02,
                 )
@@ -223,7 +228,8 @@ class Budget:
     def _start(self, g: GroupState, priority: str, now: float, need: float, probe: bool = False) -> bool:
         if g.bucket.tokens < need or self._global.tokens < 1.0:
             return False
-        if now < g.last_start + g.t.min_gap_sec or now < self._global_last + self._t.min_gap_sec:
+        gap = g.t.min_gap_sec / self._rate_factor(g, now)  # after a reopen: half rate also stretches the gap
+        if now < g.last_start + gap or now < self._global_last + self._t.min_gap_sec:
             return False
         g.bucket.tokens -= 1.0
         self._global.tokens -= 1.0
@@ -238,13 +244,29 @@ class Budget:
         return True
 
     def ok(self, group: str) -> None:
-        """A real answer from the group: reopen it and reset the cooldown ladder."""
+        """A real answer from the group: reopen it. The ladder is NOT reset: it steps down one level per
+        `cooldown_decay_sec` clean (see `_decay`), and the group runs at `reopen_rate_factor` for `reopen_slow_sec`."""
         g = self._group(group)
         if g.probing:
             g.probing = False
             g.probe_inflight = False
-        g.level = 0
-        g.step = 0.0
+            g.reopened_at = self._clock.monotonic()
+
+    def _decay(self, g: GroupState, now: float) -> None:
+        """Step the ladder down one level per `cooldown_decay_sec` without a throttle (2026-10-05: /vas/ was
+        re-challenged 30 s - 20 min after reopenings, so a full reset to 15 s probed straight back into blocks)."""
+        if g.level <= 0 or g.cooling_until > now or g.probing:
+            return
+        clean_since = max(g.last_throttle, g.last_decay)
+        k = int((now - clean_since) // self._t.cooldown_decay_sec)
+        if k <= 0:
+            return
+        g.level = max(0, g.level - k)
+        g.step = 0.0 if g.level == 0 else max(self._t.cooldown_start_sec, g.step / (2**k))
+        g.last_decay = clean_since + k * self._t.cooldown_decay_sec
+
+    def _rate_factor(self, g: GroupState, now: float) -> float:
+        return self._t.reopen_rate_factor if now - g.reopened_at < self._t.reopen_slow_sec else 1.0
 
     def released(self, group: str) -> None:
         """A request finished without a verdict on throttling (network error etc.): free the probe slot."""
@@ -267,9 +289,10 @@ class Budget:
         g = self._group(group)
         now = self._clock.monotonic()
         g.last_throttle_windows = self.windows(g)
-        # escalate on consecutive throttles (each failed probe doubles: 15 s … 300 s … 3600 s); only a success
-        # (ok) resets the ladder — a block outlasting the cooldown must not be probed at a fixed pace forever
-        if g.step <= 0 or (g.level == 0 and now - g.last_throttle > self._t.cooldown_reset_sec):
+        # escalate on every throttle (15 s … 300 s … 3600 s); the ladder only comes down by `_decay` (one level per
+        # clean `cooldown_decay_sec`), so a re-challenge soon after a reopen continues where the last block ended
+        self._decay(g, now)
+        if g.step <= 0:
             g.step = self._t.cooldown_start_sec
         else:
             g.step = min(g.step * 2, self._t.cooldown_max_sec)

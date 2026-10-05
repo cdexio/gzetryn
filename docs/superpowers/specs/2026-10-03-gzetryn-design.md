@@ -450,7 +450,11 @@ throttles into ~7,800 s of total blackout in 49 h.
   (60/min, burst 15, ≥ 0.25 s).
 - **Per-group cooldown** on a 429/403: 15 s, doubling on every
   consecutive throttle (= failed probe) up to 1 h (15, 30, 60, 120, 240,
-  480, 960, 1920, 3600 s), reset by the first success `[TUNABLE]`. After
+  480, 960, 1920, 3600 s) `[TUNABLE]`. Since 2026-10-05 13:35 a success
+  no longer resets the ladder: it steps down one level per 15 clean
+  minutes `[TUNABLE]`, and a reopened group runs at half rate (and double
+  gap) for 10 minutes `[TUNABLE]` — with the reset-on-success rule `/vas/`
+  was re-challenged 6 times in an hour, 30 s – 20 min after each reopen. After
   each cooldown exactly one request probes the group; it reopens when GMGN
   answers. (Until 2026-10-05 09:30 UTC the cap was 5 min with a time-based
   reset: `/vas/` blocks outlast 300 s, so probes hit 429 every 300 s at

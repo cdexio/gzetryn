@@ -61,7 +61,7 @@ async def test_group_reserves_and_min_gap():
 
 async def test_throttle_cools_one_group_only_then_probe():
     clock = FakeClock()
-    b = group_budget(clock, cooldown_start_sec=15, cooldown_max_sec=60, cooldown_reset_sec=100)
+    b = group_budget(clock, cooldown_start_sec=15, cooldown_max_sec=60, cooldown_decay_sec=100)
     assert b.throttle("vas") == 15
     assert b.cooling() == {"vas": 15.0} and b.paused_for() == 0
     assert await b.acquire("P1", 0.0, group="api")  # api unaffected
@@ -72,16 +72,38 @@ async def test_throttle_cools_one_group_only_then_probe():
     b.ok("vas")
     clock.advance(1)
     assert await b.acquire("P0", 0.0, group="vas")  # reopened
-    # the success reset the ladder: a new episode starts at 15 s and doubles on each consecutive throttle
-    assert [b.throttle("vas") for _ in range(5)] == [15, 30, 60, 60, 60]
+    # no reset on success: a re-challenge soon after the reopen continues the ladder
+    assert b.report()["vas"]["cooldown_level"] == 1
+    assert [b.throttle("vas") for _ in range(4)] == [30, 60, 60, 60]
     assert b.report()["vas"]["cooldown_level"] == 5
-    # a block outlasting the cooldown keeps escalating even after long gaps (no success in between)
-    clock.advance(1000)
-    assert b.throttle("vas") == 60
+    b.ok("vas")  # (pretend the probe after the last cooldown succeeded)
+    # step down one level per clean cooldown_decay_sec, counted from the last throttle
+    clock.advance(60 + 250)  # cooldown over + 2.5 decay periods after it
+    assert b.report()["vas"]["cooldown_level"] == 2  # 5 - floor(310 / 100)
+    assert b.throttle("vas") == 30  # two levels down from 60 → 15, then doubled
+    clock.advance(10_000)
     b.ok("vas")
-    assert b.report()["vas"]["cooldown_level"] == 0
-    assert b.throttle("vas") == 15
-    assert b.report()["vas"]["throttles"] == 8
+    assert b.report()["vas"]["cooldown_level"] == 0 and b.throttle("vas") == 15
+    assert b.report()["vas"]["throttles"] == 7
+
+
+async def test_half_rate_after_reopen():
+    clock = FakeClock()
+    b = group_budget(clock, reopen_slow_sec=600, reopen_rate_factor=0.5)  # vas: 60/min, gap 0.5 s
+    b.throttle("vas")
+    clock.advance(15)
+    assert await b.acquire("P0", 0.0, group="vas")  # probe
+    b.ok("vas")
+    assert b.report()["vas"]["slow_after_reopen_sec"] == pytest.approx(600)
+    clock.advance(0.6)
+    assert not await b.acquire("P0", 0.0, group="vas")  # gap stretched to 1.0 s
+    clock.advance(0.5)
+    assert await b.acquire("P0", 0.0, group="vas")
+    clock.advance(600)
+    assert b.report()["vas"]["slow_after_reopen_sec"] == 0
+    assert await b.acquire("P0", 0.0, group="vas")
+    clock.advance(0.5)
+    assert await b.acquire("P0", 0.0, group="vas")  # normal gap again
 
 
 async def test_cooldown_ladder_defaults_reach_one_hour():
@@ -161,8 +183,8 @@ async def test_throttle_serves_stale_cools_group_only():
     assert not s.cached and clock.monotonic() - t_throttle < 1
     ok = await gw.call(E.RANK_SWAPS, path={"interval": "1h"}, priority="P3")  # waits out 15 s, then probes
     assert not ok.stale and clock.monotonic() - t_throttle >= 15 and gw.budget.report()["defi"]["probing"] is False
-    gw.budget.throttle("defi")  # new episode after the success: 15 s
-    gw.budget.throttle("defi")  # consecutive: 30 s, longer than P0's 20 s wait limit
+    gw.budget.throttle("defi")  # re-challenge right after the reopen: the ladder continues (30 s)
+    gw.budget.throttle("defi")  # 60 s, longer than P0's 20 s wait limit
     with pytest.raises(Unavailable) as e:
         await gw.call(E.RANK_SWAPS, path={"interval": "5m"}, priority="P0")
     assert e.value.reason == "cooldown:defi" and e.value.retry_after_sec > 0

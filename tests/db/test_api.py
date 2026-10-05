@@ -207,8 +207,9 @@ async def test_cooldown_ladder_restored_after_restart(client):
     assert restored["vas"]["level"] == 7 and restored["vas"]["step_sec"] == 960.0
     assert not rt.budget.is_open("vas") and rt.budget.is_open("api")
     assert rt.budget.throttle("vas") == 1920  # continues the ladder instead of restarting at 15 s
-    rt.budget.ok("vas")
-    assert rt.budget.report()["vas"]["cooldown_level"] == 0
+    rt.budget.ok("vas")  # reopen: no reset, the ladder decays one level per 15 clean minutes
+    rep = rt.budget.report()["vas"]
+    assert rep["cooldown_level"] == 8 and rep["probing"] is False and rep["slow_after_reopen_sec"] > 0
 
 
 async def test_chain_and_gmgn_rows_merge(client):
