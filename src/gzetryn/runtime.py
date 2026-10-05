@@ -13,6 +13,7 @@ from gzetryn.gateway.gateway import Gateway
 from gzetryn.gmgn import endpoints as E
 from gzetryn.jobs.candidates import Candidates
 from gzetryn.jobs.chain_fallback import ChainFallback
+from gzetryn.jobs.dextools import DexTools
 from gzetryn.jobs.directory import Directory
 from gzetryn.jobs.launchlab import LaunchLab
 from gzetryn.jobs.pump_chain import PumpChain
@@ -67,7 +68,8 @@ class Runtime:
                 self.chain = ChainFallback(self.t.trigger, self.gateway, self.feed, self.watcher.context_of, self.clock)
                 self.watcher.chain = self.chain
                 self.watcher.gmgn_open = lambda: self.budget.is_open(E.WALLET_ACTIVITY.group)
-        self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed)
+        self.dextools: DexTools | None = DexTools(self.t.dextools, self.budget, self.clock) if self.t.dextools.enabled else None
+        self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed, self.dextools)
         self.candidate_store = CandidateStore(self.sessions)
         self.pump_chain: PumpChain | None = None
         if self.trigger is not None and self.t.pump_chain.enabled:
@@ -181,4 +183,6 @@ class Runtime:
         except Exception:
             log.exception("final count flush failed")
         await self.transport.close()
+        if self.dextools is not None:
+            await self.dextools.close()
         await self.engine.dispose()

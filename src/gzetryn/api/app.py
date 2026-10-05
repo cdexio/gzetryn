@@ -24,7 +24,7 @@ from gzetryn.gateway.gateway import BadRequest, Gateway, NotFound, Result, Unava
 from gzetryn.gmgn import endpoints as E
 from gzetryn.gmgn import parse
 from gzetryn.jobs.directory import Directory
-from gzetryn.jobs.token import PARTS, TokenIntel
+from gzetryn.jobs.token import DEFAULT_PARTS, PARTS, TokenIntel
 from gzetryn.store.feed import FeedStore
 from gzetryn.store.wallets import WalletStore
 
@@ -311,10 +311,13 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
         svc: Svc,
         c: Consumer,
         mint: Address,
-        parts: Annotated[str | None, Query(description="comma list of: " + ",".join(PARTS))] = None,
+        parts: Annotated[
+            str | None,
+            Query(description="comma list of: " + ",".join(PARTS) + " (default: all but snipers, which is opt-in)"),
+        ] = None,
         max_age_sec: MaxAge = None,
     ):
-        wanted = {p.strip() for p in parts.split(",") if p.strip()} if parts else set(PARTS)
+        wanted = {p.strip() for p in parts.split(",") if p.strip()} if parts else set(DEFAULT_PARTS)
         bad = wanted - set(PARTS)
         if bad:
             raise ApiError(400, "invalid_parameter", f"unknown parts: {','.join(sorted(bad))}")

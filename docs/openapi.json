@@ -1245,10 +1245,10 @@
          "type": "null"
         }
        ],
-       "description": "comma list of: info,launchpad,security,dev,dev_history,holders,smart_traders,feed",
+       "description": "comma list of: info,launchpad,security,dev,dev_history,holders,smart_traders,feed,snipers (default: all but snipers, which is opt-in)",
        "title": "Parts"
       },
-      "description": "comma list of: info,launchpad,security,dev,dev_history,holders,smart_traders,feed"
+      "description": "comma list of: info,launchpad,security,dev,dev_history,holders,smart_traders,feed,snipers (default: all but snipers, which is opt-in)"
      },
      {
       "name": "max_age_sec",

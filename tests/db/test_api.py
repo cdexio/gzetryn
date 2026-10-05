@@ -128,6 +128,22 @@ async def test_token_intel_all_parts(client):
     assert r3.status_code == 400
 
 
+async def test_token_snipers_part_opt_in(client):
+    rt = client.rt
+    # default parts unchanged (no snipers); the fixture pool is pump_amm (an AMM pool)
+    r = await client.get(f"/v1/token/{MINT}", headers=H, params={"parts": "security"})
+    assert "snipers" not in r.json()["data"]
+
+    async def fake_snipers(pool, priority="P1"):
+        return {"source": "dextools", "available": True, "pool": pool, "count": 3, "wallets": ["a", "b", "c"]}
+
+    rt.dextools.snipers = fake_snipers
+    r = await client.get(f"/v1/token/{MINT}", headers=H, params={"parts": "snipers"})
+    d = r.json()["data"]
+    assert r.status_code == 200 and d["snipers"]["count"] == 3 and d["snipers"]["exchange"] == "pump_amm"
+    assert d["snipers"]["pool"] == "95WhUbKGxbWEjj9UgZtcEAMXoBmTSmHRAFiAxPLFf1FJ"
+
+
 async def test_token_holders_partial_while_vas_cools(client):
     rt = client.rt
     rt.budget.throttle("vas")  # vas cools 15 s

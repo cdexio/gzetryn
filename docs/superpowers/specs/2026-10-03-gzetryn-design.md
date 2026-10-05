@@ -387,6 +387,13 @@ scale, 100 at migration). ≈ 6 requests/min. `source launchlab`, platform from 
 list 13–119 s after on-chain creation; a LaunchLab chain reader (0.8 MB per 30 s measured) is the fix if that lag
 matters.
 
+### 7.4 `snipers` token part from DEXTools (measure-only)
+
+Facts and design: `../plans/phase-11-dextools-snipers.md`. Opt-in part of `/v1/token/{mint}`: the token's AMM pool
+(GMGN token info) → DEXTools `shared/data/pair` → first makers (snipers). Bonding curves are not listed by DEXTools.
+Rate line `dextools` 20/min, ≥ 2 s apart `[TUNABLE]`, cache 1 h `[TUNABLE]`. Does not agree with GMGN's sniper
+counts (3/40 equal) → measure-only.
+
 ## 8. Leaderboards and "who to copy"
 
 - `GET /v1/leaderboard?period=30d|7d&tag=kol|smart_degen|all&sort=profit|pnl|winrate&limit=`:

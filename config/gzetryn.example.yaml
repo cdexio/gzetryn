@@ -11,6 +11,7 @@ budget:                   # spec §10 (revised 2026-10-05): per path group, stri
     defi: {per_minute: 20, burst: 6, min_gap_sec: 0.3}
     mrwapi: {per_minute: 20, burst: 6, min_gap_sec: 0.3}
     launchlab: {per_minute: 20, burst: 3, min_gap_sec: 1.0}  # not GMGN: Raydium LaunchLab list API
+    dextools: {per_minute: 20, burst: 3, min_gap_sec: 2.0}   # not GMGN: DEXTools pair page (snipers part)
   # P0 trigger polls, P1 API (engine), P2 interval polls, P3 background; tokens each leaves free in its group
   reserve: {P0: 0, P1: 0, P2: 1, P3: 2}
   max_wait_sec: {P0: 20, P1: 30, P2: 60, P3: 120}

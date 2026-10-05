@@ -13,16 +13,19 @@ from gzetryn.gmgn import parse
 from gzetryn.store.feed import FeedStore
 from gzetryn.store.wallets import WalletStore
 
-PARTS = ("info", "launchpad", "security", "dev", "dev_history", "holders", "smart_traders", "feed")
-GMGN_PARTS = tuple(p for p in PARTS if p != "feed")
+PARTS = ("info", "launchpad", "security", "dev", "dev_history", "holders", "smart_traders", "feed", "snipers")
+# `snipers` (DEXTools, measure-only, phase 11) is opt-in: the default part list stays as before
+DEFAULT_PARTS = tuple(p for p in PARTS if p != "snipers")
+GMGN_PARTS = tuple(p for p in PARTS if p not in ("feed", "snipers"))
 
 
 class TokenIntel:
-    def __init__(self, t: TokenTunables, gateway: Gateway, wallets: WalletStore, feed: FeedStore):
+    def __init__(self, t: TokenTunables, gateway: Gateway, wallets: WalletStore, feed: FeedStore, dextools=None):
         self._t = t
         self._gw = gateway
         self._wallets = wallets
         self._feed = feed
+        self._dextools = dextools  # DexTools client or None
 
     async def get(self, mint: str, parts: set[str], consumer: str, max_age_sec: float | None = None) -> dict:
         results: list[Result] = []
@@ -142,6 +145,15 @@ class TokenIntel:
                 errors.setdefault("dev_history", "creator unknown")
         if "feed" in parts:
             out["feed"] = await self._feed_part(mint)
+        if "snipers" in parts:
+            try:
+                out["snipers"] = await self._snipers_part(call, body_one)
+            except GatewayError as e:
+                errors["snipers"] = _err(e)
+                out["snipers"] = None
+            except RuntimeError as e:
+                errors["snipers"] = f"unavailable: {e}"
+                out["snipers"] = None
         for p in list(out):
             if p not in parts and p not in ("mint", "price"):
                 out.pop(p)
@@ -166,6 +178,25 @@ class TokenIntel:
             "gmgn_calls": len(results),
         }
         return out
+
+    async def _snipers_part(self, call, body_one: dict) -> dict:
+        """DEXTools first makers for the token's AMM pool (pool from GMGN token info, cached). Measure-only."""
+        from gzetryn.jobs.dextools import BONDING_EXCHANGES, NoPair
+
+        if self._dextools is None:
+            return {"source": "dextools", "available": False, "reason": "disabled"}
+        info = parse.token_window_info(await call(E.TOKEN_WINDOW_INFO, body=body_one))
+        pool = (info or {}).get("info", {}).get("pool") or {}
+        addr, exchange = pool.get("address"), pool.get("exchange")
+        if not addr or (exchange or "") in BONDING_EXCHANGES:
+            return {"source": "dextools", "available": False, "pool": addr, "exchange": exchange,
+                    "reason": "no AMM pool yet (bonding curve): DEXTools lists AMM pools only"}
+        try:
+            res = await self._dextools.snipers(addr)
+        except NoPair:
+            return {"source": "dextools", "available": False, "pool": addr, "exchange": exchange,
+                    "reason": "DEXTools has no pair for this pool"}
+        return {**res, "exchange": exchange}
 
     async def _feed_part(self, mint: str) -> dict:
         events = await self._feed.for_mint(mint, self._t.feed_events)

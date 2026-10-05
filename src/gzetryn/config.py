@@ -31,6 +31,8 @@ def _default_groups() -> dict[str, GroupTunables]:
         "mrwapi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),
         # not GMGN: Raydium LaunchLab list API (120 calls at 5 s + 20 at 0.3 s all 200; ~6/min needed)
         "launchlab": GroupTunables(per_minute=20, burst=3, min_gap_sec=1.0),
+        # not GMGN: DEXTools pair page (71 calls at a 2 s gap all 200) for the measure-only snipers part
+        "dextools": GroupTunables(per_minute=20, burst=3, min_gap_sec=2.0),
     }
 
 
@@ -218,6 +220,14 @@ class LaunchLabTunables(BaseModel):
     completing_min_rate: float = 25.0
 
 
+class DexToolsTunables(BaseModel):
+    """DEXTools pair page for the measure-only `snipers` token part (spec §7.4, phase 11)."""
+
+    enabled: bool = True
+    url: str = "https://www.dextools.io/shared/data/pair"
+    cache_sec: int = 3600  # [TUNABLE] first makers do not change after launch
+
+
 class TokenTunables(BaseModel):
     traders_limit: int = 50
     dev_recent_tokens: int = 10
@@ -256,6 +266,7 @@ class Tunables(BaseModel):
     candidates: CandidatesTunables = Field(default_factory=CandidatesTunables)
     pump_chain: PumpChainTunables = Field(default_factory=PumpChainTunables)
     launchlab: LaunchLabTunables = Field(default_factory=LaunchLabTunables)
+    dextools: DexToolsTunables = Field(default_factory=DexToolsTunables)
     token: TokenTunables = Field(default_factory=TokenTunables)
     copy_score: CopyScoreTunables = Field(default_factory=CopyScoreTunables)
     retention: RetentionTunables = Field(default_factory=RetentionTunables)

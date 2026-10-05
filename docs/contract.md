@@ -130,6 +130,17 @@ it is challenged, `smart_traders` is null and `holders` returns its `rates` (fro
 | `smart_traders` | KOL and smart wallets that traded it (GMGN): `[{address, tags ["kol"\|"smart_degen"], gmgn_tags, buy_usd, sell_usd, buys, sells, holding_rate, holding_usd, avg_cost_usd, avg_sold_usd, profit_usd, realized_profit_usd, unrealized_profit_usd, first_at, exited_at, last_active_at, name, twitter_username, label, directory_status}]`, oldest entry first |
 | `feed` | from our own feed: `{wallets: [{wallet, name, twitter_username, label, buys, sells, buy_usd, sell_usd, buy_sol, sell_sol, first_buy_at, last_trade_at}], events: [...]}` |
 
+**`snipers` part (opt-in, measure-only, since 2026-10-05)** — not in the default part list; ask with
+`parts=…,snipers`. Source: DEXTools' pair page for the token's **AMM pool** (pool from GMGN token info). Answer:
+`{source: "dextools", available, measure_only: true, pool, exchange, count, count_excl_creator, wallets[],
+creator, creator_is_sniper, promoted, migrated_from{exchange, pair, date}, holders, pair_created_at}`.
+`available: false` with a `reason` while the token is still on a bonding curve (DEXTools lists AMM pools only: 26/26
+curve pools unknown) or when DEXTools has no pair. Meaning (verified on 40 tokens): DEXTools' snipers are the
+first-block buyers since the token's creation, the creator included (creator_is_sniper true for 35/40 — the
+creator's own buy in the create transaction); they do **not** match GMGN's sniper counts (equal 3/40, DEXTools
+usually higher), so do not use them as a drop-in for GMGN `sniper` tags. `promoted` is DEXTools' raw flag (true
+for 32/40; meaning unverified). Cached 1 h; own rate line `dextools` (20/min, ≥ 2 s apart, cooldown policy as GMGN).
+
 `meta`: `cached` (every call from cache), `stale`, `age_sec` (oldest part), `fetched_at`, `gmgn_calls`.
 
 ## Leaderboards

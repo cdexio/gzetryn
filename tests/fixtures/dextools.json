@@ -1,0 +1,430 @@
+{
+ "mint": "C6zXoVqL77p2ZLA4Bzdua1P2GGh5ngKj9GwCBupHxUdH",
+ "pool": "AoVprHMiJ12a4kY4xfmbd4GZPfq5xLqZNJzysctZpEGz",
+ "ok": {
+  "status": 200,
+  "body": {
+   "code": "OK",
+   "data": [
+    {
+     "id": {
+      "chain": "solana",
+      "exchange": "dexfmfxea",
+      "pair": "AoVprHMiJ12a4kY4xfmbd4GZPfq5xLqZNJzysctZpEGz",
+      "token": "C6zXoVqL77p2ZLA4Bzdua1P2GGh5ngKj9GwCBupHxUdH",
+      "tokenRef": "So11111111111111111111111111111111111111112"
+     },
+     "creationBlock": 453577587,
+     "creationTime": "2026-10-05T12:20:43.840Z",
+     "creationTransaction": "4NS1mJJQADQ8oY9FAHGK8g5XDN17VYu8qiYyYLbbaoaZpfsoi5qwKNUDRGm98XnwSLfmThsMNmSKf7fN98t9oRLJ",
+     "dextScore": {
+      "information": 0,
+      "holders": 0,
+      "pool": 0,
+      "transactions": 0,
+      "creation": 0,
+      "total": 0
+     },
+     "firstSwapTimestamp": "2026-10-05T12:20:42.000Z",
+     "metrics": {
+      "balanceLpToken": 4193.388296887,
+      "initialLiquidity": 20493.73860040537,
+      "initialLiquidityUpdatedAt": "2026-10-05T12:20:43.889Z",
+      "initialReserve": 206900000,
+      "initialReserveRef": 84.990359639,
+      "liquidity": 5664.941963965719,
+      "liquidityUpdatedAt": "2026-10-05T12:54:48.538Z",
+      "reserve": 545647512.129472,
+      "reserveRef": 14.924559565000001,
+      "txCount": 4592,
+      "balanceLpTokenBurned": 4193.388296887
+     },
+     "name": "Crime Pays",
+     "nameRef": "Wrapped SOL",
+     "pool": {
+      "tokenAccount0": "7h3p1y1gLDXcGHMLJfRpcLfMT6e7YT54vd3rmHdPBFEE",
+      "tokenAccount1": "6sHvtU2U5rPGZ6bmAioLRBjgmkFVKQbNAf6WfPbX632r",
+      "openPrice": {
+       "usd": 4.95257095224876e-05,
+       "eth": 4.1077989192363464e-07,
+       "blockNumber": 453577587,
+       "timestamp": 1791202842
+      }
+     },
+     "symbol": "CRIME",
+     "symbolRef": "SOL",
+     "type": "standard-pair",
+     "migratedFrom": {
+      "date": "2026-10-05T12:20:52.298Z",
+      "exchange": "dexbewf6p",
+      "pair": "C6zXoVqL77p2ZLA4Bzdua1P2GGh5ngKj9GwCBupHxUdH"
+     },
+     "periodStats": {
+      "5m": {
+       "volume": {
+        "total": 2939.797663667381,
+        "buys": 906.3461786792993,
+        "sells": 2033.4514849880816
+       },
+       "swaps": {
+        "total": 96,
+        "buys": 50,
+        "sells": 46
+       },
+       "price": {
+        "usd": {
+         "first": 1.1521462948796611e-05,
+         "last": 6.7296824275400555e-06,
+         "min": 0,
+         "max": 1.2002398939106279e-05,
+         "diff": -41.590035419564884
+        },
+        "chain": {
+         "first": 9.414960216077408e-08,
+         "last": 5.5898004394287964e-08,
+         "min": 0,
+         "max": 9.964820922660618e-08,
+         "diff": -40.62852830877179
+        }
+       },
+       "liquidity": {
+        "usd": {
+         "first": 7801.815327301888,
+         "last": 5465.029770876682,
+         "min": 0,
+         "max": 8009.11752302736,
+         "diff": -29.951818370370724
+        }
+       },
+       "volatility": 0.5379289385272257,
+       "makers": 61,
+       "updatedAt": "2026-10-05T12:55:36.000Z"
+      },
+      "6h": {
+       "volume": {
+        "total": 275933.14721092576,
+        "buys": 139519.82423021828,
+        "sells": 136413.32298070748
+       },
+       "swaps": {
+        "total": 4673,
+        "buys": 2457,
+        "sells": 2216
+       },
+       "price": {
+        "usd": {
+         "first": 4.834909290880544e-06,
+         "last": 7.095850511496954e-06,
+         "min": 3.931886113483764e-06,
+         "max": 7.039013105921484e-05,
+         "diff": 46.76284671732989
+        },
+        "chain": {
+         "first": 4.284216796058996e-08,
+         "last": 5.893896167946196e-08,
+         "min": 3.2618825722274056e-08,
+         "max": 5.832702921105875e-07,
+         "diff": 37.572313645937015
+        }
+       },
+       "liquidity": {
+        "usd": {
+         "first": 8665.648944723634,
+         "last": 5668.687502159288,
+         "min": 5477.9481676972955,
+         "max": 27647.700996575957,
+         "diff": -34.584385562827876
+        }
+       },
+       "volatility": 48.676725803957034,
+       "makers": 803,
+       "updatedAt": "2026-10-05T12:54:46.000Z"
+      },
+      "1h": {
+       "volume": {
+        "total": 275932.8129189653,
+        "buys": 139519.82423021828,
+        "sells": 136412.98868874702
+       },
+       "swaps": {
+        "total": 4672,
+        "buys": 2457,
+        "sells": 2215
+       },
+       "price": {
+        "usd": {
+         "first": 4.834909290880544e-06,
+         "last": 7.164344081906801e-06,
+         "min": 3.931886113483764e-06,
+         "max": 7.039013105921484e-05,
+         "diff": 48.17949315864033
+        },
+        "chain": {
+         "first": 4.284216796058996e-08,
+         "last": 5.952090326145428e-08,
+         "min": 3.2618825722274056e-08,
+         "max": 5.832702921105875e-07,
+         "diff": 38.93065196001964
+        }
+       },
+       "liquidity": {
+        "usd": {
+         "first": 8665.648944723634,
+         "last": 5705.635163184494,
+         "min": 5477.9481676972955,
+         "max": 27647.700996575957,
+         "diff": -34.15801632884566
+        }
+       },
+       "volatility": 48.361454076036395,
+       "makers": 803,
+       "updatedAt": "2026-10-05T12:54:33.001Z"
+      },
+      "24h": {
+       "volume": {
+        "total": 275932.8129189653,
+        "buys": 139519.82423021828,
+        "sells": 136412.98868874702
+       },
+       "swaps": {
+        "total": 4672,
+        "buys": 2457,
+        "sells": 2215
+       },
+       "price": {
+        "usd": {
+         "first": 4.834909290880544e-06,
+         "last": 7.164344081906801e-06,
+         "min": 3.931886113483764e-06,
+         "max": 7.039013105921484e-05,
+         "diff": 48.17949315864033
+        },
+        "chain": {
+         "first": 4.284216796058996e-08,
+         "last": 5.952090326145428e-08,
+         "min": 3.2618825722274056e-08,
+         "max": 5.832702921105875e-07,
+         "diff": 38.93065196001964
+        }
+       },
+       "liquidity": {
+        "usd": {
+         "first": 8665.648944723634,
+         "last": 5705.635163184494,
+         "min": 5477.9481676972955,
+         "max": 27647.700996575957,
+         "diff": -34.15801632884566
+        }
+       },
+       "volatility": 48.361454076036395,
+       "makers": 803,
+       "updatedAt": "2026-10-05T12:54:33.001Z"
+      },
+      "7d": {
+       "volume": {
+        "total": 332860.7114413518,
+        "buys": 173082.07495740723,
+        "sells": 159778.63648394457
+       },
+       "swaps": {
+        "total": 11452,
+        "buys": 6226,
+        "sells": 5226
+       },
+       "price": {
+        "usd": {
+         "first": 8.664098121314685e-06,
+         "last": 6.816514593601309e-06,
+         "min": 6.816514593601309e-06,
+         "max": 5.938791462430386e-05,
+         "diff": -21.32459145595438
+        },
+        "chain": {
+         "first": 7.18639078685031e-08,
+         "last": 5.6624447545110156e-08,
+         "min": 5.6624447545110156e-08,
+         "max": 4.922219317515887e-07,
+         "diff": -21.206000028941055
+        }
+       },
+       "liquidity": null,
+       "volatility": null,
+       "makers": null,
+       "updatedAt": "2026-10-05T12:55:00.000Z"
+      }
+     },
+     "token": {
+      "id": {
+       "chain": "solana",
+       "token": "C6zXoVqL77p2ZLA4Bzdua1P2GGh5ngKj9GwCBupHxUdH"
+      },
+      "decimals": 6,
+      "name": "Crime Pays",
+      "symbol": "CRIME",
+      "totalSupply": "1000000000000000",
+      "creationBlock": 453576721,
+      "creationTime": "2026-10-05T12:16:54.141Z",
+      "deployment": {
+       "createdAt": "2026-10-05T12:16:54.141Z",
+       "createdAtBlockNumber": 453576721,
+       "factory": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+       "owner": "AtZ424xr2EskdYUN7y6zCb6ZMD3STkc8CPBYyaG6NvCq",
+       "provider": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+       "updatedAt": "2026-10-05T12:16:54.141Z"
+      },
+      "linksOnChain": {
+       "twitterPost": "https://x.com/PurpTheQuant/status/2107082592331628652",
+       "website": "Deployed using https://j7tracker.io"
+      },
+      "logoOnchain": "https://axiomtrading-v2.axiom-cdn.io/JALVxFmwhP96FvB9uvtzVr3RKGCRzjxDz7VBcCD2mi8d.webp",
+      "banner": "",
+      "categories": [
+       "9"
+      ],
+      "hasCustomSkin": false,
+      "logo": "",
+      "metrics": {
+       "circulatingSupply": 917483457.8814901,
+       "maxSupply": 1000000000,
+       "totalSupply": 1000000000,
+       "totalSupplyUpdatedAt": null,
+       "holdersRealTime": 111,
+       "holdersUpdatedAt": "2026-10-05T12:55:00.864Z",
+       "holders": 118,
+       "mcap": 6011.280104150977,
+       "fdv": 6551.922056481856
+      },
+      "reprPair": {
+       "id": {
+        "chain": "solana",
+        "exchange": "dexfmfxea",
+        "pair": "AoVprHMiJ12a4kY4xfmbd4GZPfq5xLqZNJzysctZpEGz",
+        "token": "C6zXoVqL77p2ZLA4Bzdua1P2GGh5ngKj9GwCBupHxUdH",
+        "tokenRef": "So11111111111111111111111111111111111111112"
+       },
+       "updatedAt": "2026-10-05T12:53:10.377Z"
+      },
+      "firstMakers": {
+       "others": [
+        "AgEGiKisqM4j2Yc6Rhk6TNRxE4XUZbhTt6Vv96axfqkB",
+        "39j2aaXEQhVq7Jur5Wy9XpYqnat7TY5rJL9fLL8NfVU9",
+        "BmThZsp3nnApBEt5XBb6fwWpAr2r964YWTMLAS9Rp5Mw",
+        "8Ltv5royXzxVG3tAhVhRnfXrzapS5Dwqt1ocxprgu6YP",
+        "ASYxNadoUc9QbAtgoE3rpLxVC9di7pj4DxVNx6xWqKif",
+        "CBKgS8Nj714YomoPPxhVLUWos7vSrWnuL2cVKnJqWo2s",
+        "5bb5kQKhp4zT3MYuFp7QSpkvJkghfLp6yjQbvTDLK2vy",
+        "EkMCzpHtYu3i2MxZUVoi33J2vgovD4MbwbHTsN6AVsAa",
+        "Eg4AozC9vNw6gCg5AyjjrdbLQaL5zb2P7XcFhcJVgghW",
+        "EaaCfVxVboPx1wht6Xvqcmq6LVhDW5ouyCBMiu2tafBG",
+        "EkXxonwVB27DoBqSEnYYjNPmF83trANHNZkq6ffkRA62",
+        "3PpgE1PkUoftrPkZ5TcYzqaVHJs27baJsd4WathmNkuP",
+        "EqgpVyzFTpuDTDmsSi9a8t5WXoAwfXxvBKBdLeXTyr4w",
+        "Hh2yn37jiXuwCM4nkvAZPbc8CjL6j32Ho38giC1y2PzL",
+        "AsZT1iZwfJH2TZeEVu4X6a9HcQ14mnXdNfxqcXEaT2At",
+        "2QqxkA6QuKgrGDbnkpKRUJ56GgVmXWS8KQYpCQ7c4Zdy",
+        "7iURkMGAvkKppKnrMbA6TH9Lgweoh4oZL6kCuh2SsVSB",
+        "haqqiUUXB5gp7gDbSjpEkw3phAjQb25r86uXJsZQgWq",
+        "EDGEKeUNA3b7L5F9BcoyvptqHAKSLi9c5JxHwFKvuNLc",
+        "3JD7zrZVXfGozgaSrnn3GzAcGsHCM5ATazX8EqwJqZWY",
+        "FbmomB2sZgwfR8ySKaUEY37XUjb9p3SUDQdBCvLqgEeg",
+        "7fdyE3wYyWcjhuLET5jX4TJWzsYum3AC32gakS1bTTSh",
+        "6rRLtKPTc5DWTaJk2hbQw1vgrRjGB4K9se6TWcXjbiFM",
+        "9A7um9R3So5a9ZgiE8H4DmrcSPhLeA18u1VbsUUKjS5A",
+        "CvN7hJE1evEjRDEcUPUFabyAjSqoZ8G1JRKBFJ5EVZtK",
+        "FvcP6yGHMWQQmdKbV1ewWsZ9sv1LHoDjissBBxEvJ69c",
+        "Aiq7aQ7s2eJR2791vAqespht2ZwUPKy3xXEE2vPaFRH5",
+        "CCCCQCrL6zVjnDeucDzcxJgxAs5ahNmrhw1CDexPhqrd",
+        "A5Zn3aRcnztbZY6Ey9Atx38sWfng3HJpcFv1kE6KF5oM",
+        "Cif4Px2ehT5feZdikzQJ2znnrn4gPZtvPHnnDo1nY1m2",
+        "ETwFDcuXBv38wD9AVTgP5quZkmkrmrHrJUJF4FGCssRi",
+        "8P4PPP2SaY6iju4U6PttAoksKtAvR8BxwYokA7M3Kru2",
+        "7stN4siUcJNd5e6s3wCcEngb1TLhYeK6dmgVWKXi2kTm",
+        "4qcufzJeyXVx2sHmHqcRMVriBReqA3JWMp2YGvMhfbcc",
+        "CXSbYvVdHmpuGgTdVKZUo4DFgUrmVtD4FES1usViHe6U",
+        "6hQSw5JDEjVvqFes2vwGnYFq9b44Yjq9wxeNVBYJpHSb",
+        "6rgDjd5oy5Wf91MxvEAnqKqyNX6johwZmatA4JNZDFNH",
+        "84UBp52FJZ5xwD5sGUqddzujNUUUAjNzNtLBfVeLXW84",
+        "8kEpLi3HApTAkAgW8GXzA8QYEyLHqNQ99ve6BX63hJzg",
+        "G9tBh7m1rnT95unrThTYvzVkud3Y9ZYctMjbx7AZH8Gh",
+        "CcVyYruRqAHfvX83M99aNL4whzbxmHwR7HMZgzTLHV9p",
+        "G1tyVnBjJBCwD6gm4CN2Kd3htsReqkc7McGYxoN7WeAc",
+        "DqhDuYbRfLoiyMZJdqEKXAA5yaUPwUGHzdD3L8K4btSL",
+        "7uZgta756G2UckX3XbjLVXEhfKzgM28ahPp74ie9L6Fv",
+        "ECv4CqSeet36DG2Mmk1hoPCs1tvVCS38F147zeBivF8f",
+        "5EA7Ko8qrwBJUAHqwor6gCZK62XyF2AUVaRk38xAiA4T",
+        "5v7TQdYjZxSQSWk1YhJfhRs5eiPTQCjtGUD24hEFDAUJ",
+        "DTHCimq1B8bsm78e2sDQ2ip3qP5UmU1kLwZWPAW11oHa",
+        "Ek5FQxXfqNefNghCkrAoB1H3JCkbsUEtBpdgPzv8impv",
+        "GpTJtCN4WbkwJ3uwcugMrsjip3ZQ22crkP3zNjU6USQK",
+        "GhjbDs6Mvpwkp2nUDXLVHkBx4TVQLS1dUiAghjKhfyS5",
+        "nya666pQkP3PzWxi7JngU3rRMHuc7zbLK8c8wxQ4qpT",
+        "G928RVjwxp3xenLAvamyirbcQajRV15f4w2MdSTaJnx5",
+        "9pMiAWZ5QQbDsZkEiBq7EQGmZQzZRDKDPk4UAeMMp2Wx",
+        "3vnqjU9PQxLayncdx7DtoJCqTizCDmnKBu5HLeNvrY9p",
+        "EzNYE4iwXAyirmz4AXFTguezvB7JXRE6KrsYFp4Y7P2D",
+        "9peH3CCgsGr7P1y9wUNNAioSDMxbafXSMcXRCFyzPci4",
+        "4mQTKp7ros7HNb4PXZjFr8nB6SKpnsr7N2LRUJy2n1fe",
+        "EkDemxNRtVxS7rtkf59k7JJveXPi1DELwsS69JTEAbXY",
+        "DH6fX7K4J8dVLcXeWFwqCu9614yWTk1xudmxx6QAkwh5",
+        "2F7dh6eCtkNjZq6MP7C8mwMxW9faNQHGfQbpD9f5e3f3",
+        "6UEXwbEL4SLmrQ7g25ssXwTzHwUVqfsLs1EZnZEVcWEB",
+        "66gH1DMbNpBaEuSVHGifm6idQJda2qoGS1KTLR9xKeMr",
+        "6KFEtsQtfBXAe8cHthYKYRkkndj9AMhEegKfZFzTZR2a",
+        "27g1nx1u2Djwy7A3qV6Go7cnQNUyefhGLdffCkNXqski",
+        "CbF68qKizPPL7H4Uu3zrmNhRatqDJYJ5UWth4Jbm1CUs",
+        "B6cAtCcwkE2vw3PyzYtbn5B4UAKgzDwiB9Bg1oHJkeHq",
+        "5tsaXsuHMNRuNzzQCK4m3SkdRizEjmzYhohmjTxHKB1w",
+        "5oNbXPzckyqHSX9zSYyY3RAtQZQ5XaC5feuoYez8RoEU",
+        "GT4tGsLZWUjnwrV4YYxLdK5GZkn6jFim8KfGpFwoa3Qp",
+        "91HTE39njLUbtU452MJ3a3uZcq8z39xe9sfP9r93PgdW",
+        "By245z2G8L2BaGNv1cyqzmfpiCF53SYhw33Nzn3GtFfN",
+        "9WKeQ7JKC3hAPj8TcvuyCCNax3XM8BrWqvieJrrRSfVA",
+        "CtivzGRAfKkVCuaQfP2N3rzZiwGF9vWxXsHKEGD3j1Rp",
+        "6DZntjnTwHdFntrRCneKxvTWg8oMLMLvfxDdwZLjdxyQ",
+        "2W8vcCmEHnGYixvryixF2EMKZtwpopLxhZvMcYBNNm2C",
+        "8wSKVk1xfWWbJGm6X11Nt6jwNhTZbLYwXqZrMBhuoJi6",
+        "AZYpJHs4tBGPUbMFozt614CMcGZ1Bn3BsZoxnwuieMPw",
+        "BDU3DirjUiyTAkgAmNSTh6WHyJog3KcThn5MpDvdDvcn",
+        "H6W1cvKo5kpnqkzmEqX5YwDWRdqMkoicFMLyE9gzyVkg",
+        "8vyVrHTx4Z94tXfrKguwi2if8zaa1vFWwUMrrFaALpJi",
+        "H7zLFgn97mi8o67JEKiod2iaFWLfpXgaqEHVaQuqt9Zn",
+        "BKhA2c1gfGH5mynbL8at8UeM5dMrYszxsBvLXzAFoFC6",
+        "3r3YDJGPYgxt9XsSNjC293LaP1CQR19Sp2BdfpneJhs1",
+        "7iW4Pq8rZwuzuiR2eenKPQu9SoZ1fyWP43XFEJaVuphb",
+        "DYXDDrZCLZVeak72eoPg7DgjYz1sW7tMaLY8PusDymQw",
+        "CNS2xkz2YptPvjNtXWyHhs3sztNUrHKoJiv4jCQKqP9b",
+        "9ikSKkTCz6QWQKnwKChpefNkw9tAyzvj7XeDeF6UX9Pe",
+        "E8jLeB1YCX33xjtvg426dxm2ERxiwoVBUawZCovnzKkX",
+        "GpWzQoGQRY5Lcb4NTeZvb2HjCcG5y8Wy46TBejzZu18g",
+        "DSV8Cb2Y5AxSWTTedxETd3T6uMxdBRzvYNuFMk1e5h4s",
+        "AEA5we6SM3WQ1S5VikLCUhpkcRrYZypqnQRvdLC9Kmgv",
+        "H5yNCEqoRRkSiKnhZaFEKpVx3RLqJcGUKqhMYPmsSdqi",
+        "2VGDUK5Frici8dTxKXZKqqDrxWb47am3Ar93rwsYrY3g",
+        "FapZ5TjyvaojdNuHkB7wKRZBtNnK1xDuha9ENp8Z75XX",
+        "GzSY6zLnQN4RUsK2dhzUsLmNnA9rxGbg934Ju7siEQHP",
+        "HiDFFdtP2tkeVYeu6s68RnpZbdveaYnVAwsGJ3fxVcCC"
+       ],
+       "snipers": [
+        "AtZ424xr2EskdYUN7y6zCb6ZMD3STkc8CPBYyaG6NvCq",
+        "F5PLKg6gtnhWNpoPzuN7NGmAYErCxQ4FS779MWu1YgCs",
+        "6anjqMeWigQFo5wpciARAunVQUXTqoat8w8fFWarCkpc"
+       ]
+      },
+      "promoted": true
+     },
+     "price": 6.551922056481856e-06
+    }
+   ]
+  }
+ },
+ "not_found": {
+  "status": 400,
+  "body": {
+   "code": "ERROR",
+   "error": {
+    "type": "ERROR",
+    "desc": "Pair not found: 9w5fKJcoGeo6M42KnLD4UCgGhBmQVMvbbebsn1hoCH49"
+   }
+  }
+ }
+}
