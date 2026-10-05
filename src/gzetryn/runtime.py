@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from gzetryn.clock import Clock
 from gzetryn.config import Settings, Tunables
@@ -76,10 +76,29 @@ class Runtime:
         self._tasks: list[asyncio.Task] = []
         self.started_at: datetime | None = None
 
+    async def restore_cooldowns(self) -> dict[str, dict]:
+        """Re-open the cooldown ladders that were running before a restart (spec §10), so a deploy during a GMGN
+        block does not start probing again at 15 s."""
+        now = self.clock.now()
+        restored = {}
+        try:
+            last = await self.ops.last_throttles(now - timedelta(seconds=self.t.budget.cooldown_max_sec))
+        except Exception:
+            log.exception("cooldown restore failed")
+            return {}
+        for group, d in last.items():
+            remaining = d["cooldown_sec"] - (now - d["at"]).total_seconds()
+            self.budget.seed(group, d["cooldown_level"], d["cooldown_sec"], remaining)
+            restored[group] = {"level": d["cooldown_level"], "step_sec": d["cooldown_sec"], "remaining_sec": round(max(0, remaining))}
+        if restored:
+            log.info("cooldowns restored", extra=fields(groups=restored))
+        return restored
+
     async def start(self, background: bool = True) -> None:
         self.started_at = self.clock.now()
         if not background:
             return
+        await self.restore_cooldowns()
         if self.t.rank.enabled:
             self._tasks.append(asyncio.create_task(self.directory.run(), name="directory"))
         if self.t.watch.enabled:

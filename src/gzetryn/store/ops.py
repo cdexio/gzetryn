@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from datetime import datetime, timedelta
 
@@ -82,6 +83,32 @@ class OpsStore:
             for e in out.values():
                 e["avg_latency_ms"] = round(e["latency_ms_sum"] / e["requests"], 1) if e["requests"] else None
                 del e["latency_ms_sum"]
+            return out
+
+    async def last_throttles(self, since: datetime) -> dict[str, dict]:
+        """Latest throttle sample per path group since `since`: {group: {at, cooldown_sec, cooldown_level}}.
+
+        Samples written since 2026-10-05 start with a JSON head {"group", "cooldown_sec", "cooldown_level", ...}."""
+        async with self._sessions() as s:
+            rows = await s.execute(
+                select(Sample.at, Sample.body)
+                .where(Sample.reason == "throttled", Sample.at >= since)
+                .order_by(Sample.at.desc())
+                .limit(200)
+            )
+            out: dict[str, dict] = {}
+            decoder = json.JSONDecoder()
+            for at, body in rows:
+                try:
+                    d, _ = decoder.raw_decode(body or "")
+                except ValueError:
+                    continue
+                if not isinstance(d, dict):
+                    continue
+                g = d.get("group")
+                if isinstance(g, str) and g not in out and isinstance(d.get("cooldown_sec"), (int, float)):
+                    level = int(d.get("cooldown_level") or 1)
+                    out[g] = {"at": at, "cooldown_sec": float(d["cooldown_sec"]), "cooldown_level": level}
             return out
 
     async def ping(self) -> bool:

@@ -181,6 +181,18 @@ async def test_chain_fallback_event_then_gmgn_duplicate_skipped(client):
     assert len((await client.get("/v1/feed", headers=H, params={"after": 0})).json()["data"]) == 1
 
 
+async def test_cooldown_ladder_restored_after_restart(client):
+    rt = client.rt
+    head = '{"group": "vas", "cooldown_sec": 960.0, "cooldown_level": 7, "requests_in_window_sec": {"10": 1}}'
+    await rt.ops.add_sample(rt.clock.now(), "wallet_activity", 429, "throttled", head + " <!DOCTYPE html>")
+    restored = await rt.restore_cooldowns()
+    assert restored["vas"]["level"] == 7 and restored["vas"]["step_sec"] == 960.0
+    assert not rt.budget.is_open("vas") and rt.budget.is_open("api")
+    assert rt.budget.throttle("vas") == 1920  # continues the ladder instead of restarting at 15 s
+    rt.budget.ok("vas")
+    assert rt.budget.report()["vas"]["cooldown_level"] == 0
+
+
 async def test_candidates_cursor_no_duplicates(client):
     rt = client.rt
     assert await rt.candidates.pump() == 6

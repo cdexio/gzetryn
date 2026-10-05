@@ -251,6 +251,17 @@ class Budget:
         g = self._group(group)
         g.probe_inflight = False
 
+    def seed(self, group: str, level: int, step: float, remaining_sec: float) -> None:
+        """Restore a cooldown ladder after a restart (from the last throttle sample): the group stays closed for the
+        remaining time, then probes; a further throttle continues doubling from `step`."""
+        g = self._group(group)
+        now = self._clock.monotonic()
+        g.level, g.step = max(0, level), max(0.0, step)
+        g.last_throttle = now
+        g.cooling_until = max(g.cooling_until, now + max(0.0, remaining_sec))
+        g.probing = True
+        g.probe_inflight = False
+
     def throttle(self, group: str = "other") -> float:
         """Record a 429/403 for `group`; returns that group's cooldown in seconds."""
         g = self._group(group)
