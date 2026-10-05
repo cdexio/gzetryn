@@ -19,6 +19,13 @@ budget:                   # spec §10 (revised 2026-10-05): per path group, stri
   global_pause_groups: 2  # global pause only when this many groups cool at once
   global_pause_sec: 60
 
+pump_chain:               # pump.fun completing/migrated from the chain (spec §7.2), on the trigger's WS connection
+  enabled: true
+  completing_min_progress: 0.55  # GMGN's completing list spanned 0.5477-1.0 (113 rows)
+  update_sec: 30          # at most one `last` refresh per mint
+  flush_sec: 1
+  migrated: true
+
 candidates:               # engine candidate source (spec §7.1)
   pump_sec: 30
   new_pairs_sec: 30

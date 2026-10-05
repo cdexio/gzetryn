@@ -150,11 +150,11 @@ keep `next_cursor` and pass it as `after`. `wait` long-polls. `kind` filters (co
 | Kind | Source |
 |---|---|
 | `new` | new pump.fun tokens on the bonding curve (`source` pump_lists), and new pools from GMGN's new pairs (`source` new_pairs: any dex; direct PumpSwap launches `launchpad_platform` pool_pump_amm, meteora, pump_mayhem included) |
-| `completing` | pump.fun tokens near the end of the bonding curve (`progress` ≈ 0.9–1.0) |
-| `migrated` | pump.fun graduations (`exchange` `pump_amm`, `pool_address` = the AMM pool). Main source: GMGN's pump.fun `completed` list (`source` pump_lists, `complete_at` set). Supplement: new pairs with `pump_amm` + launchpad `pump` + `Pump.fun` (`source` new_pairs, `complete_at` null) — 11 of 12 such rows were confirmed by the completed list and arrived ~279 s earlier, but GMGN's new pairs carry only ~16 % of graduations. The same mint can therefore appear once per kind only, from whichever source saw it first |
+| `completing` | pump.fun tokens on the bonding curve at `progress` ≥ 0.55. Main source since 2026-10-05: the chain (`source` chain — every trade of the pump.fun program, decoded from the logs; standard `Pump.fun` curves only, `pump_mayhem` excluded), plus GMGN's pump.fun list when GMGN's `vas` group is open (`source` pump_lists) |
+| `migrated` | pump.fun graduations (`exchange` `pump_amm`, `pool_address` = the AMM pool). Sources: the chain (`source` chain, from pump.fun's `CompletePumpAmmMigrationEvent`: pool, `complete_at`, ~1.7 s after the block), GMGN's pump.fun `completed` list (`source` pump_lists, `complete_at` set). Supplement: new pairs with `pump_amm` + launchpad `pump` + `Pump.fun` (`source` new_pairs, `complete_at` null) — 11 of 12 such rows were confirmed by the completed list and arrived ~279 s earlier, but GMGN's new pairs carry only ~16 % of graduations. The same mint can therefore appear once per kind only, from whichever source saw it first |
 | `trending` | GMGN 1 h swaps rank |
 
-Row: `seq, kind, mint, source (pump_lists|new_pairs|rank_swaps), first_seen_at, last_seen_at, seen_count, symbol,
+Row: `seq, kind, mint, source (chain|pump_lists|new_pairs|rank_swaps), first_seen_at, last_seen_at, seen_count, symbol,
 name, pool_address, exchange (dex: pump = bonding curve, pump_amm, raydium…, meteora_dlmm…), launchpad (e.g.
 pump), launchpad_platform (e.g. Pump.fun, pump_mayhem), quote_address, creator, created_at (token creation),
 open_at (pool open), complete_at (bonding curve completed; migrated only), first{…}, last{…}`.
@@ -162,7 +162,13 @@ open_at (pool open), complete_at (bonding curve completed; migrated only), first
 `first` (frozen at the first sighting) and `last` (latest sighting) have the same keys: `price_usd, liquidity_usd,
 mcap_usd (GMGN market cap = price × total supply = FDV), holders, volume_1h_usd, buys_1h, sells_1h, swaps_1h,
 smart_degen_count, renowned_count (KOL), sniper_count, top_10_holder_rate, progress (bonding curve 0–1)`. A field
-its source does not carry is null: pump.fun rows have no `price_usd`; new-pair rows have no buy/sell/swap counts,
+its source does not carry is null. `source chain` rows: `progress` = 1 − real token reserves / 793.1 M (equal to
+the bonding-curve account, and to GMGN's value whenever GMGN is fresh), `price_usd` = virtual SOL / virtual tokens ×
+SOL/USD, `mcap_usd` = price × total supply, `liquidity_usd` = real SOL in the curve × SOL/USD (SOL/USD: median of recent
+GMGN trades in the feed); `pool_address` = the bonding curve (PDA `["bonding-curve", mint]`); holders, volume,
+buy/sell/swap counts and tag counts null; symbol/name/created_at only when gzetryn saw the token's creation; `last` is
+refreshed at most every 30 s per mint. One row per (kind, mint): whichever source sees a mint first owns `source` and
+`seq`; later rows from the other source merge into `last` (null fields never erase values). pump.fun (GMGN) rows have no `price_usd`; new-pair rows have no buy/sell/swap counts,
 tag counts or holders (often) and no `created_at` (GMGN's value there is the pool open time, not the token's
 creation); trending rows have no `progress`.
 
@@ -186,6 +192,6 @@ For browsing; the engine should use `/v1/market/candidates`. Verified fields 202
 | Endpoint | Returns |
 |---|---|
 | `GET /health` | `status ok\|degraded\|broken`, `revision`, components `db`, `gmgn` (`global_paused_sec`, `cooling_groups {group: sec}`, `cooldown_levels {group: {level, step_sec, probing}}`, throttles, global pauses, last ok), `directory` (last refresh), `curation` (curated/manual counts, last run), `watcher` (active wallets, tiers, mode, polls, events, trigger counters), `trigger` (connected, healthy, subscriptions, reconnects, notifications) |
-| `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome incl. `denied`, average latency, req/min), last 24 h from the database (incl. throttled count), `budget` (global + `groups{vas, api, defi, mrwapi}`: limits, tokens, cooling, throttles, request counts in the last 10/60/300 s, peaks, counts before the last throttle, granted/denied per priority), cache, `candidates` job, job summaries (`watcher.trigger`: polls, hits, timeouts, caps, notification→GMGN-index p50/p90, coverage), wallet counts, feed 24 h (events, live events, lag p50/p90 overall and `live_by_source`) |
+| `GET /v1/stats` | GMGN requests since start (per consumer, per endpoint and outcome incl. `denied`, average latency, req/min), last 24 h from the database (incl. throttled count), `budget` (global + `groups{vas, api, defi, mrwapi}`: limits, tokens, cooling, throttles, request counts in the last 10/60/300 s, peaks, counts before the last throttle, granted/denied per priority), cache, `candidates` job, `pump_chain` (trades decoded, rows written, freshness block → row p50/p90), job summaries (`watcher.trigger`: polls, hits, timeouts, caps, notification→GMGN-index p50/p90, coverage), wallet counts, feed 24 h (events, live events, lag p50/p90 overall and `live_by_source`) |
 | `POST /v1/admin/refresh?curate=false` | run a rank refresh now (optionally the curation too) |
 | `POST /v1/admin/curate` | run the curation now from the latest snapshots |

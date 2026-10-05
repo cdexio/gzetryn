@@ -368,6 +368,16 @@ never returns a candidate twice per kind.
   days after the last sighting.
 - `GET /v1/market/candidates?kind=&after=&limit=&wait=` (section 11).
 
+### 7.2 pump.fun completing / migrated from the chain (owner decision D-2026-10-05-11)
+
+Facts and design: `../plans/phase-9-chain-completing.md` (verification) and `phase-9-report.md` (results).
+The trigger's WebSocket connection carries one more subscription, `logsSubscribe {mentions: [pump program]}`
+(≈ 5.5 MB per 30 s, 7.5 % of the documented 100 MB per 30 s per IP together with the wallet subscriptions; no extra
+connection, no RPC requests). TradeEvents on standard curves (`mayhem_mode` false, virtual − real tokens = 279.9 M)
+at progress ≥ 0.55 `[TUNABLE]` become `completing` rows (`source chain`, pool = bonding-curve PDA), refreshed at
+most every 30 s `[TUNABLE]`; CompletePumpAmmMigrationEvent becomes a `migrated` row with the PumpSwap pool.
+CreateEvents fill symbol/name. Rows from GMGN and the chain merge per (kind, mint).
+
 ## 8. Leaderboards and "who to copy"
 
 - `GET /v1/leaderboard?period=30d|7d&tag=kol|smart_degen|all&sort=profit|pnl|winrate&limit=`:

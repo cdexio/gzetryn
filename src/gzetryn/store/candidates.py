@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, func, select, text, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import delete, func, literal, select, text, update
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from gzetryn.gmgn.parse import CandidateRow, iso
@@ -95,11 +95,18 @@ class CandidateStore:
                 if res.rowcount:
                     new += 1
                     continue
+                # merge: a source's null fields do not erase the other source's values (GMGN holders/tags survive
+                # chain updates; chain progress/price survive GMGN rows without them)
+                merged = Candidate.last.op("||")(func.jsonb_strip_nulls(literal(r.metrics, JSONB)))
                 await s.execute(
                     update(Candidate)
                     .where(Candidate.kind == r.kind, Candidate.mint == r.mint)
                     .values(
-                        last=r.metrics,
+                        last=merged,
+                        symbol=func.coalesce(Candidate.symbol, values["symbol"]),
+                        name=func.coalesce(Candidate.name, values["name"]),
+                        creator=func.coalesce(Candidate.creator, r.creator),
+                        created_at=func.coalesce(Candidate.created_at, r.created_at),
                         last_seen_at=at,
                         seen_count=Candidate.seen_count + 1,
                         pool_address=func.coalesce(Candidate.pool_address, r.pool_address),

@@ -14,6 +14,8 @@ from gzetryn.gmgn import endpoints as E
 from gzetryn.jobs.candidates import Candidates
 from gzetryn.jobs.chain_fallback import ChainFallback
 from gzetryn.jobs.directory import Directory
+from gzetryn.jobs.pump_chain import PumpChain
+from gzetryn.trigger.solana import PUMP_PROGRAM
 from gzetryn.jobs.token import TokenIntel
 from gzetryn.jobs.watcher import Watcher
 from gzetryn.log import fields, get_logger
@@ -66,6 +68,13 @@ class Runtime:
                 self.watcher.gmgn_open = lambda: self.budget.is_open(E.WALLET_ACTIVITY.group)
         self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed)
         self.candidate_store = CandidateStore(self.sessions)
+        self.pump_chain: PumpChain | None = None
+        if self.trigger is not None and self.t.pump_chain.enabled:
+            async def sol_usd():
+                return await self.feed.recent_sol_usd(30) or await self.feed.recent_sol_usd(1440)
+
+            self.pump_chain = PumpChain(self.t.pump_chain, self.candidate_store, sol_usd, self.clock)
+            self.trigger.add_program(PUMP_PROGRAM, self.pump_chain.on_logs)
         self.candidates: Candidates | None = (
             Candidates(self.t.candidates, self.gateway, self.candidate_store, self.clock)
             if self.t.candidates.enabled
@@ -109,6 +118,8 @@ class Runtime:
                 self._tasks.append(asyncio.create_task(self.chain.run(), name="chain"))
         if self.candidates is not None:
             self._tasks.append(asyncio.create_task(self.candidates.run(), name="candidates"))
+        if self.pump_chain is not None and self.t.watch.enabled:
+            self._tasks.append(asyncio.create_task(self.pump_chain.run(), name="pump_chain"))
         self._tasks.append(asyncio.create_task(self._every(60, self._flush_counts), name="counts"))
         self._tasks.append(
             asyncio.create_task(self._every(self.t.retention.interval_sec, self._retention, 900), name="retention")
@@ -148,6 +159,12 @@ class Runtime:
             self.chain.stop()
         if self.candidates is not None:
             self.candidates.stop()
+        if self.pump_chain is not None:
+            self.pump_chain.stop()
+            try:
+                await self.pump_chain.flush()
+            except Exception:
+                log.exception("final pump chain flush failed")
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)

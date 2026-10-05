@@ -103,6 +103,11 @@ class WsTrigger:
         self._desired: set[str] = set()
         self._subs: dict[int, str] = {}  # subscription id → wallet
         self._by_wallet: dict[str, int] = {}
+        # program-level subscriptions on the same connection (spec §7.2): program id → handler(sig, slot, logs)
+        self._programs: dict[str, Callable[[str, int, list[str]], None]] = {}
+        self._prog_subs: dict[int, str] = {}
+        self._by_program: dict[str, int] = {}
+        self.program_stats: dict[str, dict] = {}
         self._pending: dict[int, tuple[str, str]] = {}  # request id → (kind, wallet)
         self._next_id = 1
         self._changed = asyncio.Event()
@@ -112,6 +117,12 @@ class WsTrigger:
         self.sigs = SigCache(t.sig_cache_sec)
 
     # ---------- public ----------
+
+    def add_program(self, program_id: str, handler: Callable[[str, int, list[str]], None]) -> None:
+        """Follow every successful transaction that mentions `program_id`; failed ones are dropped here."""
+        self._programs[program_id] = handler
+        self.program_stats[program_id] = {"notifications": 0, "failed_tx": 0, "bytes": 0, "handler_errors": 0}
+        self._changed.set()
 
     def set_wallets(self, wallets: set[str]) -> None:
         if wallets != self._desired:
@@ -149,6 +160,10 @@ class WsTrigger:
             "sub_errors": s.sub_errors,
             "mbytes": round(s.bytes / 1e6, 2),
             "last_notification_at": s.last_notification_at.isoformat() if s.last_notification_at else None,
+            "programs": {
+                p: {**st, "subscribed": p in self._by_program, "mbytes": round(st["bytes"] / 1e6, 2)}
+                for p, st in self.program_stats.items()
+            },
         }
 
     # ---------- loop ----------
@@ -177,6 +192,8 @@ class WsTrigger:
                 self._connected = False
                 self._subs.clear()
                 self._by_wallet.clear()
+                self._prog_subs.clear()
+                self._by_program.clear()
                 self._pending.clear()
             if self._stopped:
                 break
@@ -213,6 +230,19 @@ class WsTrigger:
                     await task
 
     async def _sync(self, ws) -> None:
+        busy_p = {p for k, p in self._pending.values() if k == "psub"}
+        for p in sorted(set(self._programs) - set(self._by_program) - busy_p):
+            rid = self._req("psub", p)
+            await ws.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": rid,
+                        "method": "logsSubscribe",
+                        "params": [{"mentions": [p]}, {"commitment": self._t.commitment}],
+                    }
+                )
+            )
         busy = {w for k, w in self._pending.values() if k == "sub"}
         for w in sorted(self._desired - set(self._by_wallet) - busy):
             rid = self._req("sub", w)
@@ -246,6 +276,14 @@ class WsTrigger:
             return
         if "id" in m and m.get("id") in self._pending:
             kind, wallet = self._pending.pop(m["id"])
+            if kind == "psub":
+                if "result" in m:
+                    self._prog_subs[m["result"]] = wallet
+                    self._by_program[wallet] = m["result"]
+                else:
+                    self.stats.sub_errors += 1
+                    log.warning("program subscribe failed", extra=fields(program=wallet, error=str(m.get("error"))[:200]))
+                return
             if kind == "sub":
                 if "result" in m and wallet in self._desired:
                     self._subs[m["result"]] = wallet
@@ -258,10 +296,24 @@ class WsTrigger:
         if m.get("method") != "logsNotification":
             return
         p = m.get("params") or {}
-        wallet = self._subs.get(p.get("subscription"))
         res = p.get("result") or {}
         v = res.get("value") or {}
         sig = v.get("signature")
+        program = self._prog_subs.get(p.get("subscription"))
+        if program is not None:
+            st = self.program_stats[program]
+            st["notifications"] += 1
+            st["bytes"] += len(raw)
+            if v.get("err") is not None:
+                st["failed_tx"] += 1
+                return
+            try:
+                self._programs[program](sig, int((res.get("context") or {}).get("slot") or 0), v.get("logs") or [])
+            except Exception:
+                st["handler_errors"] += 1
+                log.exception("program handler failed", extra=fields(program=program))
+            return
+        wallet = self._subs.get(p.get("subscription"))
         if not wallet or not sig:
             return
         self.stats.notifications += 1

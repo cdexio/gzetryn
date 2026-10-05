@@ -8,6 +8,7 @@ from datetime import timedelta
 from gzetryn import __version__
 from gzetryn.config import PROJECT_DIR
 from gzetryn.runtime import Runtime
+from gzetryn.trigger.solana import PUMP_PROGRAM
 
 
 def _iso(v):
@@ -112,6 +113,25 @@ class RuntimeStatus:
                 tr.update(status="degraded", reason="not every active wallet is subscribed")
             c["trigger"] = tr
 
+        if rt.pump_chain is None:
+            c["pump_chain"] = {"status": "disabled"}
+        else:
+            pc = rt.pump_chain.summary()
+            prog = (rt.trigger.summary()["programs"] if rt.trigger is not None else {}).get(PUMP_PROGRAM) or {}
+            pcs = {
+                "status": "ok",
+                "subscribed": prog.get("subscribed", False),
+                "notifications": prog.get("notifications"),
+                "mbytes": prog.get("mbytes"),
+                **{k: pc[k] for k in ("transactions", "trades", "decode_errors", "completing_new", "migrated_new",
+                                      "tracked", "last_write_at", "fresh_new_sec_p50", "fresh_new_sec_p90")},
+            }
+            if up > 120 and not pcs["subscribed"]:
+                pcs.update(status="degraded", reason="pump program not subscribed on the WebSocket")
+            elif up > 300 and not pc["transactions"]:
+                pcs.update(status="degraded", reason="no pump.fun transactions received")
+            c["pump_chain"] = pcs
+
         statuses = [v["status"] for v in c.values()]
         overall = "broken" if "broken" in statuses else "degraded" if "degraded" in statuses else "ok"
         return {
@@ -172,6 +192,7 @@ class RuntimeStatus:
                 "groups": rt.budget.report(),
             },
             "candidates": rt.candidates.summary() if rt.candidates is not None else None,
+            "pump_chain": rt.pump_chain.summary() if rt.pump_chain is not None else None,
             "cache": {"entries": len(rt.gateway.cache), "hits": rt.gateway.cache.hits, "misses": rt.gateway.cache.misses},
             "directory": rt.directory.summary(),
             "watcher": rt.watcher.summary(),

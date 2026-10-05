@@ -190,6 +190,19 @@ class CandidatesTunables(BaseModel):
     retention_days: int = 7
 
 
+class PumpChainTunables(BaseModel):
+    """pump.fun completing/migrated from the chain (spec §7.2, phase 9 report). Uses the trigger's WS connection."""
+
+    enabled: bool = True
+    # GMGN's completing list spanned progress 0.5477-1.0 (113 rows, p05 0.58) → [TUNABLE]
+    completing_min_progress: float = 0.55
+    update_sec: float = 30.0  # [TUNABLE] at most one `last` update per mint per this many seconds
+    flush_sec: float = 1.0  # [TUNABLE] queued candidate writes are flushed this often
+    names_cache: int = 200_000  # [TUNABLE] CreateEvent (name, symbol, created) remembered per mint
+    track_max: int = 20_000  # [TUNABLE] mints above the threshold kept in memory
+    migrated: bool = True  # CompletePumpAmmMigrationEvent → kind migrated (pool from the event, verified 2/2)
+
+
 class TokenTunables(BaseModel):
     traders_limit: int = 50
     dev_recent_tokens: int = 10
@@ -226,6 +239,7 @@ class Tunables(BaseModel):
     watch: WatchTunables = Field(default_factory=WatchTunables)
     trigger: TriggerTunables = Field(default_factory=TriggerTunables)
     candidates: CandidatesTunables = Field(default_factory=CandidatesTunables)
+    pump_chain: PumpChainTunables = Field(default_factory=PumpChainTunables)
     token: TokenTunables = Field(default_factory=TokenTunables)
     copy_score: CopyScoreTunables = Field(default_factory=CopyScoreTunables)
     retention: RetentionTunables = Field(default_factory=RetentionTunables)

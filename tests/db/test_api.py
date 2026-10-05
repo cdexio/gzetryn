@@ -195,6 +195,23 @@ async def test_cooldown_ladder_restored_after_restart(client):
     assert rt.budget.report()["vas"]["cooldown_level"] == 0
 
 
+async def test_chain_and_gmgn_rows_merge(client):
+    from gzetryn.gmgn.parse import CandidateRow
+
+    rt = client.rt
+    mint = "GUC1rkyDzhjJjRRda5PQoM6onvHuXsbFE51UwF8Tpump"
+    chain = CandidateRow(kind="completing", source="chain", mint=mint, pool_address="Curve1111",
+                         metrics={"progress": 0.9, "price_usd": 0.0001, "holders": None})
+    assert await rt.candidate_store.upsert([chain], rt.clock.now()) == 1
+    gm = CandidateRow(kind="completing", source="pump_lists", mint=mint, symbol="GUC", pool_address="Other",
+                      metrics={"progress": None, "price_usd": None, "holders": 182, "smart_degen_count": 8})
+    assert await rt.candidate_store.upsert([gm], rt.clock.now()) == 0  # same (kind, mint): no new row
+    row = (await rt.candidate_store.by_mint(mint))[0]
+    assert row["source"] == "chain" and row["pool_address"] == "Curve1111" and row["symbol"] == "GUC"
+    assert row["last"]["progress"] == 0.9 and row["last"]["holders"] == 182 and row["last"]["smart_degen_count"] == 8
+    assert row["first"]["progress"] == 0.9 and row["seen_count"] == 2
+
+
 async def test_candidates_cursor_no_duplicates(client):
     rt = client.rt
     assert await rt.candidates.pump() == 6
