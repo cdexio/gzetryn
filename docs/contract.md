@@ -113,7 +113,11 @@ cold token, 0 when cached. Cache per part: launchpad 60 s, security 600 s, dev 3
 120 s, smart_traders 120 s (info 30 s), so repeated calls within those windows are free (`meta.cached = true`).
 Runs at API priority, below the real-time feed. For ~200–300 tokens/day expect ≈ 1.6–1.9 extra GMGN req/min.
 A cold call takes ~2–5 s (calls are paced per group); a `cooldown:<group>` error on a part means that part's group
-is cooling — retry after `Retry-After`.
+is cooling — retry after `Retry-After`. `holders` tag counts and `smart_traders` come from the `vas` group: while
+it is challenged, `smart_traders` is null and `holders` returns its `rates` (from `api`) with
+`holder_counts_by_tag`/`trader_counts_by_tag` null and `errors.holders = "partial: …"`. For pump.fun candidates the
+`smart_degen_count` / `renowned_count` / `sniper_count` in `/v1/market/candidates` rows are an alternative.
+(`token_liquidity_stats` was checked as a substitute and rejected: it counts liquidity providers, not holders.)
 
 | Part | Fields |
 |---|---|

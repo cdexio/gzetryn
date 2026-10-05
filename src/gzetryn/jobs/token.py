@@ -60,16 +60,31 @@ class TokenIntel:
             return parse.token_dev_info(await call(E.TOKEN_DEV_INFO, path={"mint": mint}))
 
         async def holders():
-            stat, hstat, tstat = await asyncio.gather(
+            # rates come from /api/ (token_stat), the tag counts from /vas/: serve what is available, so a
+            # challenged /vas/ group does not hide the rates (spec §10)
+            res = await asyncio.gather(
                 call(E.TOKEN_STAT, path={"mint": mint}),
                 call(E.TOKEN_HOLDER_STAT, path={"mint": mint}),
                 call(E.TOKEN_TRADER_STAT, path={"mint": mint}),
+                return_exceptions=True,
             )
-            return {
-                "rates": parse.token_stat(stat),
-                "holder_counts_by_tag": parse.tag_counts(hstat),
-                "trader_counts_by_tag": parse.tag_counts(tstat),
+            if all(isinstance(x, BaseException) for x in res):
+                raise res[0]
+            for x in res:
+                if isinstance(x, BaseException) and not isinstance(x, GatewayError):
+                    raise x
+            stat, hstat, tstat = (None if isinstance(x, BaseException) else x for x in res)
+            out = {
+                "rates": parse.token_stat(stat) if stat is not None else None,
+                "holder_counts_by_tag": parse.tag_counts(hstat) if hstat is not None else None,
+                "trader_counts_by_tag": parse.tag_counts(tstat) if tstat is not None else None,
             }
+            missing = [k for k, v in out.items() if v is None]
+            if missing:
+                errors["holders"] = "partial: " + ",".join(missing) + " unavailable (" + _err(
+                    next(x for x in res if isinstance(x, BaseException))
+                ) + ")"
+            return out
 
         async def smart_traders():
             pages = await asyncio.gather(
@@ -134,7 +149,9 @@ class TokenIntel:
             out.pop("price", None)
 
         gmgn_asked = [p for p in GMGN_PARTS if p in parts]
-        failed = [p for p in gmgn_asked if p in errors and errors[p] != "creator unknown"]
+        failed = [
+            p for p in gmgn_asked if p in errors and errors[p] != "creator unknown" and not errors[p].startswith("partial:")
+        ]
         if gmgn_asked and len(failed) == len(gmgn_asked):
             if all(errors[p].startswith("not_found") for p in failed):
                 raise NotFound(f"GMGN knows no token {mint}")

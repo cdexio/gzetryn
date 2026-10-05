@@ -128,6 +128,18 @@ async def test_token_intel_all_parts(client):
     assert r3.status_code == 400
 
 
+async def test_token_holders_partial_while_vas_cools(client):
+    rt = client.rt
+    rt.budget.throttle("vas")  # vas cools 15 s
+    rt.t.budget.max_wait_sec["P1"] = 0.5  # the API call must not wait it out in this test
+    r = await client.get(f"/v1/token/{MINT}", headers=H, params={"parts": "holders,security", "max_age_sec": 0})
+    assert r.status_code == 200, r.text
+    d = r.json()["data"]
+    assert d["holders"]["rates"]["holder_count"] == 1263  # token_stat is /api/: still served
+    assert d["holders"]["holder_counts_by_tag"] is None and d["errors"]["holders"].startswith("partial:")
+    assert d["security"] is not None
+
+
 async def test_chain_fallback_event_then_gmgn_duplicate_skipped(client):
     from gzetryn.gmgn.parse import TradeRow
     from gzetryn.jobs.chain_fallback import Job
