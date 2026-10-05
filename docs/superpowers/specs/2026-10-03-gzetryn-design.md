@@ -416,8 +416,10 @@ throttles into ~7,800 s of total blackout in 49 h.
   holder/trader stats, token_traders, pump lists), `api` (token stat,
   security, dev info, dev tokens, window info, new pairs), `defi` (wallet
   rank, swaps rank, walletNew), `mrwapi` (multi_token_info). Each has its
-  own token bucket and minimum gap `[TUNABLE]`: vas 20/min, burst 4,
-  ≥ 1.0 s apart (smooths trigger storms); api 30/min, burst 8, 0.3 s; defi
+  own token bucket and minimum gap `[TUNABLE]`: vas 12/min, burst 3,
+  ≥ 1.0 s apart (normal need ≈ 7.5/min; lowered from 20/min, burst 4 on
+  2026-10-05 after re-challenges that followed reopenings flushing 13–15
+  requests in 60 s); api 30/min, burst 8, 0.3 s; defi
   and mrwapi 20/min, burst 6, 0.3 s. A global bucket keeps the overall cap
   (60/min, burst 15, ≥ 0.25 s).
 - **Per-group cooldown** on a 429/403: 15 s, doubling on every

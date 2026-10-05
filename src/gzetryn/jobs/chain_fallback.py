@@ -56,6 +56,7 @@ class ChainFallback:
         self._clock = clock or Clock()
         self._q: deque[Job] = deque()
         self._queued: set[str] = set()
+        self._done: dict[str, float] = {}  # signature → monotonic time it was processed (kept 10 min, insertion order)
         self._wake = asyncio.Event()
         self._stopped = False
         self._session: AsyncSession | None = None
@@ -74,6 +75,7 @@ class ChainFallback:
             "not_a_swap": 0,
             "events": 0,
             "duplicates": 0,
+            "skipped_known": 0,
             "last_event_at": None,
             "last_error": None,
         }
@@ -83,7 +85,11 @@ class ChainFallback:
         self._wake.set()
 
     def enqueue(self, wallet: str, signature: str, notified_at: str) -> None:
-        if signature in self._queued:
+        mono = self._clock.monotonic()
+        while self._done and mono - self._done[next(iter(self._done))] > 600:
+            self._done.pop(next(iter(self._done)))
+        if signature in self._queued or signature in self._done:
+            self.stats["skipped_known"] += 1  # already queued or decoded (failed trigger retries re-route it)
             return
         if len(self._q) >= self._t.chain_queue_max:
             self.stats["dropped_full"] += 1
@@ -104,6 +110,7 @@ class ChainFallback:
                     continue
                 job = self._q.popleft()
                 self._queued.discard(job.signature)
+                self._done[job.signature] = self._clock.monotonic()
                 if self._clock.monotonic() - job.queued > self._t.chain_max_age_sec:
                     self.stats["dropped_old"] += 1
                     continue

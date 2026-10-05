@@ -24,7 +24,8 @@ class GroupTunables(BaseModel):
 def _default_groups() -> dict[str, GroupTunables]:
     return {
         # /vas/: wallet_activity (feed), token holder/trader stats, token_traders, pump lists — the challenged group
-        "vas": GroupTunables(per_minute=20, burst=4, min_gap_sec=1.0),
+        # 12/min, burst 3: normal need ≈ 7.5/min; re-challenges followed reopenings that flushed 13-15 req/60 s
+        "vas": GroupTunables(per_minute=12, burst=3, min_gap_sec=1.0),
         "api": GroupTunables(per_minute=30, burst=8, min_gap_sec=0.3),
         "defi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),
         "mrwapi": GroupTunables(per_minute=20, burst=6, min_gap_sec=0.3),

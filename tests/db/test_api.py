@@ -162,6 +162,8 @@ async def test_chain_fallback_event_then_gmgn_duplicate_skipped(client):
     assert not rt.budget.is_open("vas")
     rt.watcher.on_trade(g["wallet"], g["tx_hash"], 1)
     assert rt.watcher.stats.chain_routed == 1 and rt.chain.summary()["queue"] == 1
+    rt.chain.enqueue(g["wallet"], g["tx_hash"], "x")  # re-routed by a failed retry: not queued twice
+    assert rt.chain.summary()["queue"] == 1 and rt.chain.summary()["skipped_known"] == 1
     await rt.chain._process(Job(g["wallet"], g["tx_hash"], rt.clock.monotonic(), rt.clock.now().isoformat()))
     s = rt.chain.summary()
     assert s["decoded"] == 1 and s["events"] == 1
