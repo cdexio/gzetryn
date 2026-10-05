@@ -620,12 +620,14 @@ def candidates_pump(body: Any) -> list[CandidateRow]:
 
 
 def candidates_new_pairs(body: Any) -> list[CandidateRow]:
-    """GET /api/v1/pairs/sol/new_pairs/{interval}: `address` = pool, `base_address` = mint. Always kind `new`.
+    """GET /api/v1/pairs/sol/new_pairs/{interval}: `address` = pool, `base_address` = mint.
 
-    Verified 2026-10-05: a new `pump_amm` pool is not necessarily a pump.fun migration (tokens are also launched
-    directly on PumpSwap, `launchpad_platform` pool_pump_amm), and `base_token_info.creation_timestamp` equals the
-    pool open time even for real migrations — so neither the kind nor the token creation time can be told from
-    these rows. Migrations come only from the pump.fun `completed` list; `created_at` stays null here.
+    Kind (verified 2026-10-05 against the pump.fun `completed` list): a new `pump_amm` pool with launchpad `pump`
+    and platform `Pump.fun` is a pump.fun graduation (11 of 12 such rows were in the completed list, seen there
+    ~279 s later) → `migrated`. Other new pump_amm pools (`pool_pump_amm` direct PumpSwap launches, meteora,
+    `pump_mayhem`: 0 of 42 in the completed list) and every other pool → `new`. GMGN's new pairs carry only a
+    minority of graduations (11 of 67), so the completed list stays the main source of `migrated`.
+    `base_token_info.creation_timestamp` equals the pool open time even for graduations → `created_at` stays null.
     No buy/sell counts or holder tags in these rows."""
     out = []
     for r in _list(_dict(data(body)).get("pairs")):
@@ -636,9 +638,14 @@ def candidates_new_pairs(body: Any) -> list[CandidateRow]:
         if not mint:
             continue
         bv, sv = f(b.get("buy_volume_1h")), f(b.get("sell_volume_1h"))
+        graduation = (
+            s(r.get("exchange")) == "pump_amm"
+            and s(r.get("launchpad")) == "pump"
+            and s(r.get("launchpad_platform")) == "Pump.fun"
+        )
         out.append(
             CandidateRow(
-                kind="new",
+                kind="migrated" if graduation else "new",
                 source="new_pairs",
                 mint=mint,
                 symbol=s(b.get("symbol")),

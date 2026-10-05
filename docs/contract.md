@@ -149,9 +149,9 @@ keep `next_cursor` and pass it as `after`. `wait` long-polls. `kind` filters (co
 
 | Kind | Source |
 |---|---|
-| `new` | new pump.fun tokens on the bonding curve (`source` pump_lists), and every new pool from GMGN's new pairs (`source` new_pairs: any dex, incl. pump_amm pools — a new pump_amm pool may be a migration *or* a direct PumpSwap launch, GMGN's row cannot tell) |
+| `new` | new pump.fun tokens on the bonding curve (`source` pump_lists), and new pools from GMGN's new pairs (`source` new_pairs: any dex; direct PumpSwap launches `launchpad_platform` pool_pump_amm, meteora, pump_mayhem included) |
 | `completing` | pump.fun tokens near the end of the bonding curve (`progress` ≈ 0.9–1.0) |
-| `migrated` | pump.fun tokens that completed the bonding curve and migrated — only from GMGN's pump.fun `completed` list (`complete_at` set, `exchange` `pump_amm`, `pool_address` = the AMM pool) |
+| `migrated` | pump.fun graduations (`exchange` `pump_amm`, `pool_address` = the AMM pool). Main source: GMGN's pump.fun `completed` list (`source` pump_lists, `complete_at` set). Supplement: new pairs with `pump_amm` + launchpad `pump` + `Pump.fun` (`source` new_pairs, `complete_at` null) — 11 of 12 such rows were confirmed by the completed list and arrived ~279 s earlier, but GMGN's new pairs carry only ~16 % of graduations. The same mint can therefore appear once per kind only, from whichever source saw it first |
 | `trending` | GMGN 1 h swaps rank |
 
 Row: `seq, kind, mint, source (pump_lists|new_pairs|rank_swaps), first_seen_at, last_seen_at, seen_count, symbol,

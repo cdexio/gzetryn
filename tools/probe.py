@@ -158,8 +158,8 @@ def cmd_ctx(directory: str, needles: list[str], before: int, after: int, limit: 
                 i = t.find(n, i + 1)
 
 
-def cmd_burst(path: str, n: int, gap: float) -> None:
-    s = requests.Session(impersonate="chrome")
+def cmd_burst(path: str, n: int, gap: float, impersonate: str = "chrome") -> None:
+    s = requests.Session(impersonate=impersonate)
     counts: collections.Counter = collections.Counter()
     lat = []
     url = BASE + fill(path)
@@ -200,6 +200,7 @@ def main() -> None:
     b.add_argument("path")
     b.add_argument("--n", type=int, default=30)
     b.add_argument("--gap", type=float, default=1.0)
+    b.add_argument("--impersonate", default="chrome", help="curl_cffi browser profile, e.g. chrome, safari, firefox")
     po = sub.add_parser("post")
     po.add_argument("path")
     po.add_argument("body")
@@ -222,7 +223,7 @@ def main() -> None:
     elif a.cmd == "grep":
         cmd_grep(a.urls, a.save)
     else:
-        cmd_burst(a.path, a.n, a.gap)
+        cmd_burst(a.path, a.n, a.gap, a.impersonate)
 
 
 if __name__ == "__main__":
