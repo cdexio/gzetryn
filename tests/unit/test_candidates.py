@@ -24,7 +24,7 @@ def test_pump_lists_kinds_and_pools():
 
 def test_new_pairs_pool_is_row_address():
     rows = parse.candidates_new_pairs(load_fixture("new-pairs.json"))
-    assert rows and all(r.source == "new_pairs" for r in rows)
+    assert rows and all(r.source == "new_pairs" and r.kind == "new" and r.created_at is None for r in rows)
     raw = load_fixture("new-pairs.json")["data"]["pairs"][0]
     assert rows[0].pool_address == raw["address"] and rows[0].mint == raw["base_address"]
     assert rows[0].metrics["buys_1h"] is None  # not in these rows

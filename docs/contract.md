@@ -138,9 +138,9 @@ keep `next_cursor` and pass it as `after`. `wait` long-polls. `kind` filters (co
 
 | Kind | Source |
 |---|---|
-| `new` | new pump.fun tokens on the bonding curve, and other new pools from GMGN's new pairs |
+| `new` | new pump.fun tokens on the bonding curve (`source` pump_lists), and every new pool from GMGN's new pairs (`source` new_pairs: any dex, incl. pump_amm pools — a new pump_amm pool may be a migration *or* a direct PumpSwap launch, GMGN's row cannot tell) |
 | `completing` | pump.fun tokens near the end of the bonding curve (`progress` ≈ 0.9–1.0) |
-| `migrated` | pump.fun tokens that completed and migrated (`exchange` `pump_amm`, `pool_address` = the AMM pool) |
+| `migrated` | pump.fun tokens that completed the bonding curve and migrated — only from GMGN's pump.fun `completed` list (`complete_at` set, `exchange` `pump_amm`, `pool_address` = the AMM pool) |
 | `trending` | GMGN 1 h swaps rank |
 
 Row: `seq, kind, mint, source (pump_lists|new_pairs|rank_swaps), first_seen_at, last_seen_at, seen_count, symbol,
@@ -152,7 +152,8 @@ open_at (pool open), complete_at (bonding curve completed; migrated only), first
 mcap_usd (GMGN market cap = price × total supply = FDV), holders, volume_1h_usd, buys_1h, sells_1h, swaps_1h,
 smart_degen_count, renowned_count (KOL), sniper_count, top_10_holder_rate, progress (bonding curve 0–1)`. A field
 its source does not carry is null: pump.fun rows have no `price_usd`; new-pair rows have no buy/sell/swap counts,
-tag counts or holders (often); trending rows have no `progress`.
+tag counts or holders (often) and no `created_at` (GMGN's value there is the pool open time, not the token's
+creation); trending rows have no `progress`.
 
 `pool_address`: pump.fun rows carry it (bonding-curve account while new/completing, AMM pool when migrated); new
 pairs carry it; trending rows do not, so gzetryn resolves it from GMGN token info before storing — it can still

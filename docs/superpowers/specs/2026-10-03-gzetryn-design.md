@@ -307,9 +307,9 @@ never returns a candidate twice per kind.
 
 | Kind | GMGN source (verified 2026-10-05) | Every `[TUNABLE]` |
 |---|---|---|
-| `new` | pump.fun `new_creation` (POST `/vas/api/v1/rank/sol`, 50) and non-pump_amm rows of `/api/v1/pairs/sol/new_pairs/1m` (50) | 30 s |
+| `new` | pump.fun `new_creation` (POST `/vas/api/v1/rank/sol`, 50) and every row of `/api/v1/pairs/sol/new_pairs/1m` (50) | 30 s |
 | `completing` | pump.fun `pump` list (bonding progress ≈ 0.9–1.0) | 30 s |
-| `migrated` | pump.fun `completed` list (pool = AMM pool, `exchange` pump_amm), and `pump_amm` rows of new pairs | 30 s |
+| `migrated` | pump.fun `completed` list only (pool = AMM pool, `exchange` pump_amm, `complete_timestamp`). New-pair rows cannot be used: a new pump_amm pool is also how direct PumpSwap launches look, and their `creation_timestamp` equals the pool open time even for real migrations (verified 2026-10-05) | 30 s |
 | `trending` | `/defi/quotation/v1/rank/sol/swaps/1h` (50) | 60 s |
 
 - One row per (kind, mint); `seq` is assigned at the first sighting only.

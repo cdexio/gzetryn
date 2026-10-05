@@ -620,8 +620,13 @@ def candidates_pump(body: Any) -> list[CandidateRow]:
 
 
 def candidates_new_pairs(body: Any) -> list[CandidateRow]:
-    """GET /api/v1/pairs/sol/new_pairs/{interval}: `address` = pool, `base_address` = mint. A new pump_amm pool is a
-    migration (kind migrated), every other new pool is kind new. No buy/sell counts or holder tags in these rows."""
+    """GET /api/v1/pairs/sol/new_pairs/{interval}: `address` = pool, `base_address` = mint. Always kind `new`.
+
+    Verified 2026-10-05: a new `pump_amm` pool is not necessarily a pump.fun migration (tokens are also launched
+    directly on PumpSwap, `launchpad_platform` pool_pump_amm), and `base_token_info.creation_timestamp` equals the
+    pool open time even for real migrations — so neither the kind nor the token creation time can be told from
+    these rows. Migrations come only from the pump.fun `completed` list; `created_at` stays null here.
+    No buy/sell counts or holder tags in these rows."""
     out = []
     for r in _list(_dict(data(body)).get("pairs")):
         if not isinstance(r, dict):
@@ -630,22 +635,21 @@ def candidates_new_pairs(body: Any) -> list[CandidateRow]:
         mint = s(r.get("base_address")) or s(b.get("address"))
         if not mint:
             continue
-        exchange = s(r.get("exchange"))
         bv, sv = f(b.get("buy_volume_1h")), f(b.get("sell_volume_1h"))
         out.append(
             CandidateRow(
-                kind="migrated" if exchange == "pump_amm" else "new",
+                kind="new",
                 source="new_pairs",
                 mint=mint,
                 symbol=s(b.get("symbol")),
                 name=s(b.get("name")),
                 pool_address=s(r.get("address")),
-                exchange=exchange,
+                exchange=s(r.get("exchange")),
                 launchpad=s(r.get("launchpad")),
                 launchpad_platform=s(r.get("launchpad_platform")),
                 quote_address=s(r.get("quote_address")),
                 creator=s(b.get("creator")),
-                created_at=ts(b.get("creation_timestamp")),
+                created_at=None,
                 open_at=ts(r.get("open_timestamp")),
                 metrics=_metrics(
                     price_usd=f(b.get("price")),
