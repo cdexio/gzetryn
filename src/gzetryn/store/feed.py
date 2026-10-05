@@ -14,6 +14,7 @@ from gzetryn.gmgn.parse import TradeRow, iso
 from gzetryn.store.models import Trade
 
 FEED_LOCK = 7_301_993  # advisory lock key: serializes transactions that insert trades
+TAGGED = "tagged"  # wallet_status of watch-only tagged wallets (phase 14): kept out of /v1/feed by default
 
 
 @dataclass
@@ -141,12 +142,16 @@ class FeedStore:
         side: str | None = None,
         tag: str | None = None,
         include_baseline: bool = False,
+        include_tagged: bool = False,
         limit: int = 500,
     ) -> tuple[list[dict], int]:
-        """Events after `after` and the next cursor (moves past filtered-out events; seq commits in order)."""
+        """Events after `after` and the next cursor (moves past filtered-out events; seq commits in order).
+        Watch-only tagged wallets (phase 14) are left out unless `include_tagged`."""
         async with self._sessions() as s:
             hi = (await s.execute(select(func.coalesce(func.max(Trade.seq), 0)))).scalar_one()
             q = select(Trade).where(Trade.seq > after, Trade.seq <= hi)
+            if not include_tagged:
+                q = q.where(Trade.wallet_status.is_distinct_from(TAGGED))
             if wallet:
                 q = q.where(Trade.wallet == wallet)
             if mint:
@@ -183,8 +188,49 @@ class FeedStore:
 
     async def for_mint(self, mint: str, limit: int) -> list[dict]:
         async with self._sessions() as s:
-            q = select(Trade).where(Trade.mint == mint).order_by(Trade.seq.desc()).limit(limit)
+            q = (
+                select(Trade)
+                .where(Trade.mint == mint, Trade.wallet_status.is_distinct_from(TAGGED))
+                .order_by(Trade.seq.desc())
+                .limit(limit)
+            )
             return [trade_dict(t) for t in (await s.execute(q)).scalars()]
+
+    async def tag_buyers(self, mint: str, since: datetime, tags: list[str]) -> list[dict]:
+        """Per wallet that traded `mint` since `since` (active and tagged alike): its GMGN tags, status, first buy,
+        SOL and token amounts bought / sold. Live events only (no watch baseline)."""
+        async with self._sessions() as s:
+            q = (
+                select(
+                    Trade.wallet,
+                    Trade.wallet_status,
+                    Trade.wallet_tags,
+                    func.min(Trade.trade_at).filter(Trade.side == "buy"),
+                    func.count().filter(Trade.side == "buy"),
+                    func.coalesce(func.sum(Trade.sol_amount).filter(Trade.side == "buy"), 0.0),
+                    func.coalesce(func.sum(Trade.sol_amount).filter(Trade.side == "sell"), 0.0),
+                    func.coalesce(func.sum(Trade.token_amount).filter(Trade.side == "buy"), 0.0),
+                    func.coalesce(func.sum(Trade.token_amount).filter(Trade.side == "sell"), 0.0),
+                )
+                .where(Trade.mint == mint, Trade.trade_at >= since, Trade.baseline.is_(False))
+                .group_by(Trade.wallet, Trade.wallet_status, Trade.wallet_tags)
+            )
+            out: dict[str, dict] = {}
+            for wallet, status, wtags, first_buy, buys, buy_sol, sell_sol, buy_tok, sell_tok in await s.execute(q):
+                w = out.setdefault(
+                    wallet,
+                    {"wallet": wallet, "status": status, "tags": [t for t in (wtags or []) if t in tags],
+                     "first_buy_at": None, "buys": 0, "buy_sol": 0.0, "sell_sol": 0.0, "buy_tokens": 0.0,
+                     "sell_tokens": 0.0},
+                )
+                if first_buy is not None and (w["first_buy_at"] is None or first_buy < w["first_buy_at"]):
+                    w["first_buy_at"] = first_buy
+                w["buys"] += buys
+                w["buy_sol"] += float(buy_sol)
+                w["sell_sol"] += float(sell_sol)
+                w["buy_tokens"] += float(buy_tok)
+                w["sell_tokens"] += float(sell_tok)
+            return list(out.values())
 
     async def for_wallet(self, wallet: str, limit: int) -> list[dict]:
         async with self._sessions() as s:

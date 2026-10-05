@@ -7,6 +7,8 @@
   trigger it is a slow **sweep** (900/1800/3600 s) for trades the chain path cannot see; with the legacy trigger
   the fallback intervals; when the trigger is down, the normal intervals. A notification the decoder could not
   fetch pulls that wallet's sweep forward. All wallet polls run at P3, below engine token intel and pump lists.
+- **tagged** (phase 14, D-2026-10-05-15): watch-only GMGN-tagged wallets on their own WS connections; their swaps
+  always go to the chain decoder and are stored as `wallet_status = tagged`. Never polled, swept or counted active.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from gzetryn.clock import Clock
-from gzetryn.config import TriggerTunables, WatchTunables
+from gzetryn.config import TaggedTunables, TriggerTunables, WatchTunables
 from gzetryn.core import watch as W
 from gzetryn.gateway.gateway import Gateway, GatewayError
 from gzetryn.gmgn import endpoints as E
@@ -67,6 +69,8 @@ class WatchStats:
     miss_polls: int = 0  # sweeps pulled forward by a notification the decoder could not fetch
     # live trades GMGN delivered whose signature the chain decoder had (reason: not_a_swap, fetch_failed, dropped_*)
     chain_missed_found: Counter = field(default_factory=Counter)
+    tagged_routed: int = 0  # swap-like notifications of tagged (watch-only) wallets handed to the decoder
+    tagged_shed: int = 0  # tagged swaps skipped because the decoder queue was half full
 
 
 class Watcher:
@@ -78,9 +82,11 @@ class Watcher:
         feed: FeedStore,
         clock: Clock | None = None,
         trigger_t: TriggerTunables | None = None,
+        tagged_t: TaggedTunables | None = None,
     ):
         self._t = t
         self._tt = trigger_t or TriggerTunables(enabled=False)
+        self._tagt = tagged_t or TaggedTunables(enabled=False)
         self._gw = gateway
         self._wallets = wallets
         self._feed = feed
@@ -88,6 +94,9 @@ class Watcher:
         self.trigger = None  # WsTrigger, attached by the runtime
         self.chain = None  # ChainFallback, attached by the runtime (spec §6.2)
         self.gmgn_open: Callable[[], bool] = lambda: True  # is GMGN's /vas/ group (wallet_activity) open?
+        self.tagged_triggers: list = []  # WsTrigger per tagged connection, attached by the runtime (phase 14)
+        self._tagged: dict[str, Wallet] = {}
+        self._shard: dict[str, int] = {}  # tagged wallet → connection index (sticky: a move costs subscriptions)
         self._ctx: dict[str, Wallet] = {}
         self._due: dict[str, float] = {}
         self._trig_due: dict[str, float] = {}
@@ -158,6 +167,9 @@ class Watcher:
         self._started = True
         if self.trigger is not None:
             self.trigger.set_wallets(set(self._ctx))
+        if self._tagt.enabled and self.tagged_triggers:
+            rows = await self._wallets.tagged(self._tagt.tags, self._tagt.max_trades_per_day, self._tagt.max_wallets)
+            self._set_tagged([w for w in rows if w.address not in self._ctx])
         now_dt = self._clock.now()
         tiers: dict[str, int] = {}
         for w in self._ctx.values():
@@ -165,7 +177,47 @@ class Watcher:
             tiers[k] = tiers.get(k, 0) + 1
         self.stats.tiers = tiers
 
+    def _set_tagged(self, rows: list[Wallet]) -> None:
+        """Keep each tagged wallet on the connection it already has; new ones fill the emptiest connection with room.
+        Wallets beyond the connections' room are left out (counted in the summary)."""
+        fresh = {w.address: w for w in rows}
+        for addr in list(self._shard):
+            if addr not in fresh:
+                del self._shard[addr]
+        load = Counter(self._shard.values())
+        room = self._tagt.per_connection
+        for addr in fresh:
+            if addr in self._shard:
+                continue
+            free = [i for i in range(len(self.tagged_triggers)) if load[i] < room]
+            if not free:
+                break
+            i = min(free, key=lambda k: (load[k], k))
+            self._shard[addr] = i
+            load[i] += 1
+        self._tagged = {a: fresh[a] for a in self._shard}
+        for i, trig in enumerate(self.tagged_triggers):
+            trig.set_wallets({a for a, k in self._shard.items() if k == i})
+
+    def tag_universe(self) -> dict[str, int]:
+        """Watched wallets (active and tagged) per tagged.tags tag: the denominator of the tag_buyers counts."""
+        out = dict.fromkeys(self._tagt.tags, 0)
+        for w in (*self._ctx.values(), *self._tagged.values()):
+            for t in set(w.gmgn_tags or []) & out.keys():
+                out[t] += 1
+        return out
+
     # ---------- trigger ----------
+
+    def on_tagged_trade(self, wallet: str, signature: str, slot: int) -> None:
+        """A swap-like transaction of a watch-only tagged wallet: decoded from the chain, never a GMGN poll."""
+        if wallet not in self._tagged or self.chain is None:
+            return
+        if self.chain.backlog >= self._tt.chain_queue_max // 2:
+            self.stats.tagged_shed += 1  # the other half of the decoder queue stays free for active wallets
+            return
+        self.stats.tagged_routed += 1
+        self.chain.enqueue(wallet, signature, self._clock.now().isoformat())
 
     def on_trade(self, wallet: str, signature: str, slot: int) -> None:
         """Called by the WsTrigger for a swap-like, successful transaction that mentions an active wallet."""
@@ -190,7 +242,14 @@ class Watcher:
 
     def context_of(self, wallet: str) -> WalletContext | None:
         w = self._ctx.get(wallet)
-        return self._context(w) if w is not None else None
+        if w is not None:
+            return self._context(w)
+        w = self._tagged.get(wallet)
+        if w is not None:
+            ctx = self._context(w)
+            ctx.status = "tagged"
+            return ctx
+        return None
 
     def _schedule_trigger(self, wallet: str, at: float) -> bool:
         mono = self._clock.monotonic()
@@ -446,5 +505,16 @@ class Watcher:
                 },
                 "chain_routed": s.chain_routed,
                 "chain": self.chain.summary() if self.chain is not None else None,
+            }
+        if self.tagged_triggers:
+            out["tagged"] = {
+                "wallets": len(self._tagged),
+                "routed": s.tagged_routed,
+                "shed": s.tagged_shed,
+                "connections": [
+                    {k: t.summary()[k] for k in ("connected", "subscriptions", "wallets", "reconnects", "last_disconnect",
+                                                 "notifications", "swap_like", "sub_errors", "mbytes")}
+                    for t in self.tagged_triggers
+                ],
             }
         return out

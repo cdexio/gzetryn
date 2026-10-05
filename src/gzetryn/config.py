@@ -140,6 +140,23 @@ class CurationTunables(BaseModel):
     min_candidates: int = 50  # fewer candidates (failed rank fetch) → run skipped, nothing changes
 
 
+class TaggedTunables(BaseModel):
+    """Watch-only GMGN-tagged wallets for the own `tag_buyers` token part (phase 14, D-2026-10-05-15).
+
+    Ranked wallets that are neither curated nor manual: decoded from the chain only (never a GMGN poll), stored in
+    the feed table as `wallet_status = tagged`, left out of /v1/feed unless asked. 5 Oct: 248 ranked, 171 at
+    <= 150 trades/day (avg 46.2/day). The public WS closes a connection at its 100th subscription attempt (code 1013,
+    probed at 20 ms and 400 ms spacing), so tagged wallets get their own connections of `per_connection` each.
+    """
+
+    enabled: bool = True
+    tags: list[str] = Field(default_factory=lambda: ["kol", "smart_degen", "renowned"])  # [TUNABLE]
+    max_trades_per_day: float = 150.0  # [TUNABLE] same bot filter as the curation
+    max_wallets: int = 200  # [TUNABLE]
+    per_connection: int = Field(85, ge=1, le=95)  # [TUNABLE] below the 100-attempt cap, room for churn
+    buyers_window_min: int = 30  # [TUNABLE] default look-back of the tag_buyers part
+
+
 class DirectoryTunables(BaseModel):
     manual_metrics_sec: int = 21600  # wallet_stat refresh for manual wallets outside the ranks
 
@@ -315,6 +332,7 @@ class Tunables(BaseModel):
     cache: CacheTunables = Field(default_factory=CacheTunables)
     rank: RankTunables = Field(default_factory=RankTunables)
     curation: CurationTunables = Field(default_factory=CurationTunables)
+    tagged: TaggedTunables = Field(default_factory=TaggedTunables)
     directory: DirectoryTunables = Field(default_factory=DirectoryTunables)
     watch: WatchTunables = Field(default_factory=WatchTunables)
     trigger: TriggerTunables = Field(default_factory=TriggerTunables)

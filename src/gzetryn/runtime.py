@@ -58,7 +58,7 @@ class Runtime:
         self.budget = Budget(self.t.budget, self.clock)
         self.gateway = Gateway(self.t, self.transport, self.budget, hooks=SampleHooks(self.ops, self.clock), clock=self.clock)
         self.directory = Directory(self.t, self.gateway, self.wallets, self.clock)
-        self.watcher = Watcher(self.t.watch, self.gateway, self.wallets, self.feed, self.clock, self.t.trigger)
+        self.watcher = Watcher(self.t.watch, self.gateway, self.wallets, self.feed, self.clock, self.t.trigger, self.t.tagged)
         self.trigger: WsTrigger | None = None
         self.chain: ChainFallback | None = None
         if self.t.trigger.enabled:
@@ -69,8 +69,16 @@ class Runtime:
                 self.chain.on_miss = self.watcher.on_chain_miss
                 self.watcher.chain = self.chain
                 self.watcher.gmgn_open = lambda: self.budget.is_open(E.WALLET_ACTIVITY.group)
+                if self.t.tagged.enabled:
+                    # phase 14: watch-only tagged wallets on their own connections (100-subscription cap per connection)
+                    n = -(-self.t.tagged.max_wallets // self.t.tagged.per_connection)
+                    self.watcher.tagged_triggers = [
+                        WsTrigger(self.t.trigger, self.watcher.on_tagged_trade, self.clock) for _ in range(n)
+                    ]
         self.dextools: DexTools | None = DexTools(self.t.dextools, self.budget, self.clock) if self.t.dextools.enabled else None
-        self.token = TokenIntel(self.t.token, self.gateway, self.wallets, self.feed, self.dextools)
+        self.token = TokenIntel(
+            self.t.token, self.gateway, self.wallets, self.feed, self.dextools, self.t.tagged, self.watcher.tag_universe
+        )
         self.candidate_store = CandidateStore(self.sessions)
         self.pump_chain: PumpChain | None = None
         if self.trigger is not None and self.t.pump_chain.enabled:
@@ -126,6 +134,8 @@ class Runtime:
             self._tasks.append(asyncio.create_task(self.watcher.run(), name="watcher"))
             if self.trigger is not None:
                 self._tasks.append(asyncio.create_task(self.trigger.run(), name="trigger"))
+            for i, trig in enumerate(self.watcher.tagged_triggers):
+                self._tasks.append(asyncio.create_task(trig.run(), name=f"tagged-trigger-{i}"))
             if self.chain is not None:
                 self._tasks.append(asyncio.create_task(self.chain.run(), name="chain"))
         if self.candidates is not None:
@@ -169,6 +179,8 @@ class Runtime:
         self.watcher.stop()
         if self.trigger is not None:
             self.trigger.stop()
+        for trig in self.watcher.tagged_triggers:
+            trig.stop()
         if self.chain is not None:
             self.chain.stop()
         if self.candidates is not None:

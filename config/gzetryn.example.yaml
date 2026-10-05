@@ -63,6 +63,14 @@ curation:                 # owner decision 2026-10-03 ("recommended")
   min_trades_30d: 20      # buy_30d + sell_30d >= this (owner 2026-10-03)
   min_candidates: 50      # fewer → run skipped
 
+tagged:                   # phase 14, D-2026-10-05-15: watch-only GMGN-tagged wallets for the tag_buyers part
+  enabled: true
+  tags: [kol, smart_degen, renowned]
+  max_trades_per_day: 150 # same bot filter as the curation
+  max_wallets: 200
+  per_connection: 85      # public WS closes a connection at its 100th subscription attempt (probed 2026-10-05)
+  buyers_window_min: 30
+
 directory:
   manual_metrics_sec: 21600
 

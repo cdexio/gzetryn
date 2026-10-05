@@ -301,18 +301,21 @@ class ChainFallback:
         self.stats["decoded"] += 1
         ct = trades[0]
         symbol = supply = None
-        with contextlib.suppress(GatewayError):
-            # P1: below engine token intel (P0), above the background lists (D-2026-10-05-14)
-            r = await self._gw.call(
-                E.TOKEN_WINDOW_INFO,
-                body={"chain": E.CHAIN, "addresses": [ct.mint]},
-                priority="P1",
-                consumer="gzetryn",
-                max_wait_sec=self._t.chain_enrich_max_wait_sec,  # never hold the event for the /api/ budget
-            )
-            p = parse.token_window_info(r.body)
-            if p is not None and p["info"]["mint"] == ct.mint:
-                symbol, supply = p["info"]["symbol"], p["info"]["total_supply"]
+        # tagged (watch-only, phase 14) events are counted per mint and never shown: no GMGN /api/ call for them,
+        # so ~3x more decoded swaps do not press on the still-open /api/ group
+        if ctx.status != "tagged":
+            with contextlib.suppress(GatewayError):
+                # P1: below engine token intel (P0), above the background lists (D-2026-10-05-14)
+                r = await self._gw.call(
+                    E.TOKEN_WINDOW_INFO,
+                    body={"chain": E.CHAIN, "addresses": [ct.mint]},
+                    priority="P1",
+                    consumer="gzetryn",
+                    max_wait_sec=self._t.chain_enrich_max_wait_sec,  # never hold the event for the /api/ budget
+                )
+                p = parse.token_window_info(r.body)
+                if p is not None and p["info"]["mint"] == ct.mint:
+                    symbol, supply = p["info"]["symbol"], p["info"]["total_supply"]
         sol_usd, sol_usd_src = await self.sol_usd()
         price_sol = ct.sol_amount / ct.token_amount if ct.token_amount else None
         price_usd = price_sol * sol_usd if price_sol is not None and sol_usd else None

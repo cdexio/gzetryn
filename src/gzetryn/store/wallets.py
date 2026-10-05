@@ -408,6 +408,24 @@ class WalletStore:
             q = select(Wallet).where(or_(Wallet.curated.is_(True), Wallet.manual.is_(True)))
             return list((await s.execute(q)).scalars())
 
+    async def tagged(self, tags: list[str], max_trades_per_day: float, limit: int) -> list[Wallet]:
+        """Watch-only wallets (phase 14): ranked, neither curated nor manual, carrying one of `tags`, not bot-paced;
+        highest 30d realized profit first."""
+        async with self._sessions() as s:
+            q = (
+                select(Wallet)
+                .where(
+                    func.jsonb_array_length(Wallet.rank_lists) > 0,
+                    Wallet.curated.is_(False),
+                    Wallet.manual.is_(False),
+                    or_(*(Wallet.gmgn_tags.contains([t]) for t in tags)),
+                    func.coalesce(Wallet.trades_per_day_30d, 0.0) <= max_trades_per_day,
+                )
+                .order_by(Wallet.realized_profit_30d.desc().nulls_last(), Wallet.address)
+                .limit(limit)
+            )
+            return list((await s.execute(q)).scalars())
+
     async def record_poll(
         self, address: str, at: datetime, ok: bool, error: str | None, last_trade_at: datetime | None
     ) -> None:

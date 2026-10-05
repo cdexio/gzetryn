@@ -69,6 +69,11 @@ watch {started_at, last_poll_at, last_poll_ok_at, last_poll_error, last_trade_at
   cursor never skips an event. `meta.last_seq` is the newest seq overall. `seq` is increasing but not dense
   (gaps are normal); never infer "missed events" from a gap.
 - `tag` matches the wallet's GMGN tags or its manual tags (as frozen in the event).
+- `include_tagged=false` (default): events of the **watch-only tagged wallets** (phase 14, since 2026-10-05:
+  ranked GMGN kol / smart_degen / renowned wallets that are neither curated nor manual, `wallet_status = tagged`)
+  are left out, so copy-trading consumers see exactly the curated + manual set as before. `include_tagged=true`
+  adds them. They are chain-decoded only (`source = chain`, `symbol`/`total_supply` and the USD fields from
+  supply always null) and are never swept by GMGN, so a tagged trade the chain path misses is simply absent.
 
 Event: `seq, trade_at (block time), seen_at (our poll), lag_sec (seen − trade), wallet, wallet_name,
 twitter_username, wallet_tags, label, user_tags, wallet_status (frozen at event time), side, mint, symbol,
@@ -146,6 +151,16 @@ first-block buyers since the token's creation, the creator included (creator_is_
 creator's own buy in the create transaction); they do **not** match GMGN's sniper counts (equal 3/40, DEXTools
 usually higher), so do not use them as a drop-in for GMGN `sniper` tags. `promoted` is DEXTools' raw flag (true
 for 32/40; meaning unverified). Cached 1 h; own rate line `dextools` (20/min, ≥ 2 s apart, cooldown policy as GMGN).
+
+**`tag_buyers` part (opt-in, measure-only, since 2026-10-05, phase 14, D-2026-10-05-15)** — ask with
+`parts=…,tag_buyers&window_min=<1..1440>` (default 30). Our own replacement for the `vas`-only tag counts: from
+gzetryn's feed table (active **and** tagged wallets), no GMGN call, so it answers while `vas` is closed. Answer:
+`{source: "own", measure_only: true, window_min, buyers, by_tag{kol, smart_degen, renowned: {buyers, holding}},
+universe{kol, smart_degen, renowned}, wallets[{wallet, status, tags, first_buy_at, buys, buy_sol, sell_sol,
+buy_tokens, sell_tokens, holding}]}`. `buyers` = wallets with ≥ 1 buy of the mint in the window; `holding` = bought
+more tokens than they sold in the window. `universe` = watched wallets per tag at answer time (the denominator):
+about 250 wallets (GMGN's kol / smart_degen top lists plus the curated and manual ones), not GMGN's whole tag
+database, so counts read lower than GMGN's `holder_counts_by_tag` — compare like with like.
 
 `meta`: `cached` (every call from cache), `stale`, `age_sec` (oldest part), `fetched_at`, `gmgn_calls`.
 

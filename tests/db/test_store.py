@@ -157,3 +157,48 @@ async def test_feed_idempotent_ordered_baseline_and_cursor(sessions):
     assert len(await feed.for_mint(t1.mint, 10)) == 3
     st = await feed.stats(T0 - timedelta(days=1))
     assert st["events"] == 3 and st["live_events"] == 2
+
+
+async def test_tagged_wallets_selection(sessions):
+    """Phase 14: ranked, neither curated nor manual, carrying a wanted tag, not bot-paced, top profit first."""
+    ws = WalletStore(sessions)
+    D = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+    rows = [
+        row(A, 1, 900, tags=("kol",)),
+        row(B, 2, 500, tags=("smart_degen",)),
+        row(C, 3, 300, tags=("sniper",)),  # wrong tag
+        row(D, 4, 800, buys=3000, sells=3000, tags=("kol",)),  # 200 trades/day: bot-paced
+    ]
+    await ws.store_rank(T0, {("kol", "30d"): rows}, True)
+    got = [w.address for w in await ws.tagged(["kol", "smart_degen"], 150.0, 10)]
+    assert got == [A, B]
+    assert [w.address for w in await ws.tagged(["kol", "smart_degen"], 150.0, 1)] == [A]
+    await ws.add_manual(A, "mine", None, None, "test", T0)  # active wallets are never tagged
+    assert [w.address for w in await ws.tagged(["kol", "smart_degen"], 150.0, 10)] == [B]
+
+
+async def test_feed_tagged_rows_hidden_and_tag_buyers(sessions):
+    """Phase 14: tagged rows stay out of /v1/feed and the feed part, and are counted by tag_buyers."""
+    feed = FeedStore(sessions)
+    mint = "EHfj12MDoETURYUFxm9CNr1E8zhpCZqZy9u4njbQpump"
+    active = WalletContext(A, "a", None, ["kol"], None, [], "curated", T0)
+    tagged_b = WalletContext(B, "b", None, ["smart_degen"], None, [], "tagged", T0)
+    tagged_c = WalletContext(C, "c", None, ["kol", "smart_degen"], None, [], "tagged", T0)
+    at = T0 + timedelta(minutes=1)
+    await feed.insert(active, [trade("a1", at)], seen_at=at)
+    b = trade("b1", at)
+    b.wallet = B
+    await feed.insert(tagged_b, [b], seen_at=at)
+    c_buy, c_sell = trade("c1", at, amount=10.0), trade("c2", at + timedelta(seconds=5), side="sell", amount=10.0)
+    c_buy.wallet = c_sell.wallet = C
+    await feed.insert(tagged_c, [c_buy, c_sell], seen_at=at + timedelta(seconds=5))
+    rows, _ = await feed.read(0)
+    assert [r["wallet"] for r in rows] == [A]
+    rows, _ = await feed.read(0, include_tagged=True)
+    assert {r["wallet"] for r in rows} == {A, B, C}
+    assert {r["wallet"] for r in await feed.for_mint(mint, 10)} == {A}
+    got = {r["wallet"]: r for r in await feed.tag_buyers(mint, T0, ["kol", "smart_degen"])}
+    assert set(got) == {A, B, C}
+    assert got[B]["status"] == "tagged" and got[B]["tags"] == ["smart_degen"] and got[B]["buys"] == 1
+    assert got[C]["buy_tokens"] == 10.0 and got[C]["sell_tokens"] == 10.0  # sold all: not holding
+    assert await feed.tag_buyers(mint, at + timedelta(minutes=1), ["kol"]) == []  # outside the window

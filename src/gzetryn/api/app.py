@@ -286,6 +286,9 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
         side: Literal["buy", "sell"] | None = None,
         tag: Annotated[str | None, Query(pattern=TAG_RE)] = None,
         baseline: bool = False,
+        include_tagged: Annotated[
+            bool, Query(description="also the watch-only GMGN-tagged wallets (phase 14); off for copy-trading consumers")
+        ] = False,
     ):
         cursor0 = after if after is not None else (since or 0)
         deadline = time.monotonic() + min(wait, svc.t.api.feed_max_wait_sec)
@@ -297,6 +300,7 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
                 side=side,
                 tag=tag,
                 include_baseline=baseline,
+                include_tagged=include_tagged,
                 limit=_limit(svc, limit),
             )
             if rows or time.monotonic() >= deadline:
@@ -313,15 +317,21 @@ def create_app(open_backend: Callable[[], AbstractAsyncContextManager[Backend]])
         mint: Address,
         parts: Annotated[
             str | None,
-            Query(description="comma list of: " + ",".join(PARTS) + " (default: all but snipers, which is opt-in)"),
+            Query(
+                description="comma list of: " + ",".join(PARTS)
+                + " (default: all but snipers and tag_buyers, which are opt-in)"
+            ),
         ] = None,
         max_age_sec: MaxAge = None,
+        window_min: Annotated[
+            int | None, Query(ge=1, le=1440, description="tag_buyers look-back in minutes (default tagged.buyers_window_min)")
+        ] = None,
     ):
         wanted = {p.strip() for p in parts.split(",") if p.strip()} if parts else set(DEFAULT_PARTS)
         bad = wanted - set(PARTS)
         if bad:
             raise ApiError(400, "invalid_parameter", f"unknown parts: {','.join(sorted(bad))}")
-        out = await svc.token.get(mint, wanted, c, max_age_sec)
+        out = await svc.token.get(mint, wanted, c, max_age_sec, window_min=window_min)
         meta = out.pop("_meta")
         return _envelope(out, _meta(**meta))
 

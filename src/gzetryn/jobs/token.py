@@ -4,31 +4,80 @@ All GMGN calls run at P0, the top priority of every group (D-2026-10-05-14)."""
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from gzetryn.config import TokenTunables
+from gzetryn.config import TaggedTunables, TokenTunables
 from gzetryn.gateway.gateway import Gateway, GatewayError, NotFound, Result, Unavailable
 from gzetryn.gmgn import endpoints as E
 from gzetryn.gmgn import parse
 from gzetryn.store.feed import FeedStore
 from gzetryn.store.wallets import WalletStore
 
-PARTS = ("info", "launchpad", "security", "dev", "dev_history", "holders", "smart_traders", "feed", "snipers")
-# `snipers` (DEXTools, measure-only, phase 11) is opt-in: the default part list stays as before
-DEFAULT_PARTS = tuple(p for p in PARTS if p != "snipers")
-GMGN_PARTS = tuple(p for p in PARTS if p not in ("feed", "snipers"))
+PARTS = (
+    "info", "launchpad", "security", "dev", "dev_history", "holders", "smart_traders", "feed", "snipers", "tag_buyers"
+)
+# opt-in parts, measure-only: `snipers` (DEXTools, phase 11), `tag_buyers` (own feed, phase 14)
+OPT_IN_PARTS = ("snipers", "tag_buyers")
+DEFAULT_PARTS = tuple(p for p in PARTS if p not in OPT_IN_PARTS)
+GMGN_PARTS = tuple(p for p in PARTS if p not in ("feed", *OPT_IN_PARTS))
+
+
+def tag_buyers(rows: list[dict], tags: list[str], window_min: int, universe: dict[str, int]) -> dict:
+    """Own smart/KOL buyer counts for one mint (phase 14): per tag, the wallets that bought in the window and how many
+    of them still hold (bought more tokens than they sold in the window). Pure."""
+    buyers = [r for r in rows if r["buys"] > 0]
+    for r in buyers:
+        r["holding"] = r["buy_tokens"] > r["sell_tokens"]
+    by_tag = {}
+    for t in tags:
+        tagged = [r for r in buyers if t in r["tags"]]
+        by_tag[t] = {"buyers": len(tagged), "holding": sum(1 for r in tagged if r["holding"])}
+    return {
+        "source": "own",
+        "measure_only": True,
+        "window_min": window_min,
+        "buyers": len(buyers),
+        "by_tag": by_tag,
+        "universe": universe,
+        "wallets": sorted(
+            (
+                {**r, "first_buy_at": r["first_buy_at"].isoformat() if r["first_buy_at"] else None}
+                for r in buyers
+            ),
+            key=lambda r: r["first_buy_at"] or "~",
+        ),
+    }
 
 
 class TokenIntel:
-    def __init__(self, t: TokenTunables, gateway: Gateway, wallets: WalletStore, feed: FeedStore, dextools=None):
+    def __init__(
+        self,
+        t: TokenTunables,
+        gateway: Gateway,
+        wallets: WalletStore,
+        feed: FeedStore,
+        dextools=None,
+        tagged_t: TaggedTunables | None = None,
+        universe: Callable[[], dict[str, int]] | None = None,
+    ):
         self._t = t
         self._gw = gateway
         self._wallets = wallets
         self._feed = feed
         self._dextools = dextools  # DexTools client or None
+        self._tagt = tagged_t or TaggedTunables()
+        self._universe = universe or (lambda: {})
 
-    async def get(self, mint: str, parts: set[str], consumer: str, max_age_sec: float | None = None) -> dict:
+    async def get(
+        self,
+        mint: str,
+        parts: set[str],
+        consumer: str,
+        max_age_sec: float | None = None,
+        window_min: int | None = None,
+    ) -> dict:
         results: list[Result] = []
 
         async def call(ep: E.Endpoint, **kw) -> Any:
@@ -157,6 +206,11 @@ class TokenIntel:
             except RuntimeError as e:
                 errors["snipers"] = f"unavailable: {e}"
                 out["snipers"] = None
+        if "tag_buyers" in parts:
+            win = window_min or self._tagt.buyers_window_min
+            since = datetime.now(timezone.utc) - timedelta(minutes=win)
+            rows = await self._feed.tag_buyers(mint, since, self._tagt.tags)
+            out["tag_buyers"] = tag_buyers(rows, self._tagt.tags, win, self._universe())
         for p in list(out):
             if p not in parts and p not in ("mint", "price"):
                 out.pop(p)
