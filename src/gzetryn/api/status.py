@@ -205,6 +205,7 @@ class RuntimeStatus:
             },
             "candidates": rt.candidates.summary() if rt.candidates is not None else None,
             "pump_chain": rt.pump_chain.summary() if rt.pump_chain is not None else None,
+            "launch_paths": rt.launch_paths.summary() if rt.launch_paths is not None else None,
             "launchlab": rt.launchlab.summary() if rt.launchlab is not None else None,
             "dextools": rt.dextools.stats if rt.dextools is not None else None,
             "cache": {"entries": len(rt.gateway.cache), "hits": rt.gateway.cache.hits, "misses": rt.gateway.cache.misses},

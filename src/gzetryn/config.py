@@ -279,6 +279,23 @@ class PumpChainTunables(BaseModel):
     migrated: bool = True  # CompletePumpAmmMigrationEvent → kind migrated (pool from the event, verified 2/2)
 
 
+class LaunchPathsTunables(BaseModel):
+    """Curve path recorder (phase 15, engine research G1, D-2026-10-06-01): per pump.fun launch whose CreateEvent we
+    saw, the first `window_sec` of its bonding curve as one compact row. Fed by the pump program stream (no extra
+    connection or RPC). ~46k launches/day; ~1k in flight at a 30 min window."""
+
+    enabled: bool = True
+    window_sec: int = 1800  # [TUNABLE]
+    # [TUNABLE] price checkpoints after the create (s): the last trade price at or before each offset
+    checkpoints_sec: list[int] = Field(default_factory=lambda: [10, 30, 60, 120, 300, 600, 900, 1800])
+    first_buyers: int = 10  # [TUNABLE] earliest distinct buyers kept per launch
+    bundle_slots: int = 1  # [TUNABLE] buys in the create slot and this many slots after count as a bundle
+    max_tracked_traders: int = 2000  # [TUNABLE] distinct buyers/sellers counted per launch (memory bound)
+    max_in_flight: int = 20_000  # [TUNABLE] launches in memory; the oldest is finalized early beyond this
+    flush_sec: float = 5.0  # [TUNABLE] finalized rows are written this often
+    retention_days: int = 30  # [TUNABLE]
+
+
 class LaunchLabTunables(BaseModel):
     """Raydium LaunchLab lists (spec §7.3, phase 10). Rate line `launchlab` in budget.groups."""
 
@@ -338,6 +355,7 @@ class Tunables(BaseModel):
     trigger: TriggerTunables = Field(default_factory=TriggerTunables)
     candidates: CandidatesTunables = Field(default_factory=CandidatesTunables)
     pump_chain: PumpChainTunables = Field(default_factory=PumpChainTunables)
+    launch_paths: LaunchPathsTunables = Field(default_factory=LaunchPathsTunables)
     launchlab: LaunchLabTunables = Field(default_factory=LaunchLabTunables)
     dextools: DexToolsTunables = Field(default_factory=DexToolsTunables)
     token: TokenTunables = Field(default_factory=TokenTunables)

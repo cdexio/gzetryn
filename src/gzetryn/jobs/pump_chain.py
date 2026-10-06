@@ -51,6 +51,7 @@ class PumpChain:
         self._queue: dict[tuple[str, str], tuple[CandidateRow, float, bool]] = {}
         self._sol_price: tuple[float, float | None] = (-1e9, None)
         self._stopped = False
+        self.paths = None  # LaunchPaths (phase 15), attached by the runtime: gets every create / trade / graduation
         self.last_tx_mono = -1e9
         self.fresh_new = deque(maxlen=2000)  # first sightings: row write time − event block time (s)
         self.fresh_updates = deque(maxlen=2000)
@@ -81,17 +82,31 @@ class PumpChain:
     def on_logs(self, signature: str, slot: int, logs: list[str]) -> None:
         self.last_tx_mono = self._clock.monotonic()
         self.stats["transactions"] += 1
+        paths = self.paths
         for kind, d in S.events_from_logs(logs):
             try:
                 if kind == "trade":
-                    self._trade(S.decode_trade(d))
+                    t = S.decode_trade(d)
+                    self._trade(t)
+                    if paths is not None:
+                        paths.on_trade(t, slot)
                 elif kind == "create":
-                    self._create(S.decode_create(d))
-                elif kind == "migration" and self._t.migrated:
-                    self._migration(S.decode_migration(d))
-                elif kind == "complete" and self._t.migrated:
+                    c = S.decode_create(d)
+                    self._create(c)
+                    if paths is not None:
+                        paths.on_create(c, slot)
+                elif kind == "migration":
+                    m = S.decode_migration(d)
+                    if self._t.migrated:
+                        self._migration(m)
+                    if paths is not None:
+                        paths.on_complete(m.mint, m.timestamp, m.pool)
+                elif kind == "complete":
                     mint, curve, ts = S.decode_complete(d)
-                    self._tracked.pop(mint, None)
+                    if self._t.migrated:
+                        self._tracked.pop(mint, None)
+                    if paths is not None:
+                        paths.on_complete(mint, ts)
             except (struct.error, IndexError, ValueError, KeyError):
                 self.stats["decode_errors"] += 1
 

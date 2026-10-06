@@ -15,6 +15,7 @@ from gzetryn.jobs.candidates import Candidates
 from gzetryn.jobs.chain_fallback import ChainFallback
 from gzetryn.jobs.dextools import DexTools
 from gzetryn.jobs.directory import Directory
+from gzetryn.jobs.launch_paths import LaunchPaths
 from gzetryn.jobs.launchlab import LaunchLab
 from gzetryn.jobs.pump_chain import PumpChain
 from gzetryn.trigger.solana import PUMP_PROGRAM
@@ -24,6 +25,7 @@ from gzetryn.log import fields, get_logger
 from gzetryn.store.candidates import CandidateStore
 from gzetryn.store.db import make_engine, make_sessionmaker
 from gzetryn.store.feed import FeedStore
+from gzetryn.store.launch_paths import LaunchPathStore
 from gzetryn.store.ops import OpsStore
 from gzetryn.store.wallets import WalletStore
 from gzetryn.transport.http import HttpTransport
@@ -81,6 +83,8 @@ class Runtime:
         )
         self.candidate_store = CandidateStore(self.sessions)
         self.pump_chain: PumpChain | None = None
+        self.launch_paths: LaunchPaths | None = None
+        self.launch_path_store: LaunchPathStore | None = None
         if self.trigger is not None and self.t.pump_chain.enabled:
             async def sol_usd():
                 if self.chain is not None:  # GMGN's wSOL price, else the feed median (fewer GMGN trades since chain-first)
@@ -89,6 +93,10 @@ class Runtime:
 
             self.pump_chain = PumpChain(self.t.pump_chain, self.candidate_store, sol_usd, self.clock)
             self.trigger.add_program(PUMP_PROGRAM, self.pump_chain.on_logs)
+            if self.t.launch_paths.enabled:  # phase 15: curve path per launch, on the same program stream
+                self.launch_path_store = LaunchPathStore(self.sessions)
+                self.launch_paths = LaunchPaths(self.t.launch_paths, self.launch_path_store, self.clock)
+                self.pump_chain.paths = self.launch_paths
         self.candidates: Candidates | None = (
             Candidates(self.t.candidates, self.gateway, self.candidate_store, self.clock)
             if self.t.candidates.enabled
@@ -142,6 +150,8 @@ class Runtime:
             self._tasks.append(asyncio.create_task(self.candidates.run(), name="candidates"))
         if self.pump_chain is not None and self.t.watch.enabled:
             self._tasks.append(asyncio.create_task(self.pump_chain.run(), name="pump_chain"))
+            if self.launch_paths is not None:
+                self._tasks.append(asyncio.create_task(self.launch_paths.run(), name="launch_paths"))
         if self.launchlab is not None:
             self._tasks.append(asyncio.create_task(self.launchlab.run(), name="launchlab"))
         self._tasks.append(asyncio.create_task(self._every(60, self._flush_counts), name="counts"))
@@ -172,6 +182,10 @@ class Runtime:
     async def _retention(self) -> None:
         removed = await self.ops.retention(self.t.retention, self.clock.now())
         removed["candidates"] = await self.candidate_store.retention(self.t.candidates.retention_days, self.clock.now())
+        if self.launch_path_store is not None:
+            removed["launch_paths"] = await self.launch_path_store.retention(
+                self.t.launch_paths.retention_days, self.clock.now()
+            )
         log.info("retention", extra=fields(**removed))
 
     async def stop(self) -> None:
@@ -193,6 +207,12 @@ class Runtime:
                 await self.pump_chain.flush()
             except Exception:
                 log.exception("final pump chain flush failed")
+        if self.launch_paths is not None:
+            self.launch_paths.stop()  # launches still in their window are lost on a restart (accepted, measured)
+            try:
+                await self.launch_paths.flush()
+            except Exception:
+                log.exception("final launch path flush failed")
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)

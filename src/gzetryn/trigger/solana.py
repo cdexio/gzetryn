@@ -104,6 +104,7 @@ class Trade:
     mayhem_mode: bool | None
     quote_mint: str | None
     creator: str | None = None
+    user: str | None = None  # the trader (phase 15: unique buyers, dev trades, same-slot bundles)
 
     @property
     def standard_curve(self) -> bool:
@@ -134,6 +135,7 @@ def decode_trade(d: bytes) -> Trade:
     sol, tok = struct.unpack_from("<QQ", d, o)
     o += 16
     is_buy = d[o] == 1
+    user = b58encode(d[o + 1 : o + 33])
     o += 1 + 32  # is_buy, user
     (ts,) = struct.unpack_from("<q", d, o)
     o += 8
@@ -158,7 +160,7 @@ def decode_trade(d: bytes) -> Trade:
                 o += 4 + k * 40  # shareholders: Vec<{address: pubkey, bps: u64}>
                 if o + 32 <= len(d):
                     quote = b58encode(d[o : o + 32])
-    return Trade(mint, sol, tok, is_buy, ts, vsol, vtok, rsol, rtok, ix_name, mayhem, quote, creator)
+    return Trade(mint, sol, tok, is_buy, ts, vsol, vtok, rsol, rtok, ix_name, mayhem, quote, creator, user)
 
 
 _KINDS = {TRADE_EVENT: "trade", COMPLETE_EVENT: "complete", CREATE_EVENT: "create", MIGRATION_EVENT: "migration"}

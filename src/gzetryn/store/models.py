@@ -203,6 +203,48 @@ class Candidate(Base):
     last: Mapped[dict] = mapped_column(JSONB)  # metrics at the latest sighting
 
 
+class LaunchPath(Base):
+    """pump.fun bonding-curve path of one launch over its first window (phase 15). Prices are SOL per whole token
+    from the curve's virtual reserves; offsets are seconds after the CreateEvent's block time."""
+
+    __tablename__ = "launch_paths"
+    __table_args__ = (
+        Index("ix_launch_paths_created", "created_at"),
+        Index("ix_launch_paths_creator", "creator"),
+    )
+
+    mint: Mapped[str] = mapped_column(ADDR, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(TS)
+    creator: Mapped[str | None] = mapped_column(ADDR)
+    name: Mapped[str | None] = mapped_column(String(128))
+    symbol: Mapped[str | None] = mapped_column(String(64))
+    mayhem: Mapped[bool | None] = mapped_column(Boolean)
+    window_sec: Mapped[int] = mapped_column(Integer)
+    finalized_at: Mapped[datetime] = mapped_column(TS)
+    trades: Mapped[int] = mapped_column(Integer)
+    buys: Mapped[int] = mapped_column(Integer)
+    sells: Mapped[int] = mapped_column(Integer)
+    buyers: Mapped[int] = mapped_column(Integer)
+    sellers: Mapped[int] = mapped_column(Integer)
+    sol_in: Mapped[float] = mapped_column(Float)
+    sol_out: Mapped[float] = mapped_column(Float)
+    dev_buy_sol: Mapped[float] = mapped_column(Float)
+    dev_sell_sol: Mapped[float] = mapped_column(Float)
+    dev_first_sell_sec: Mapped[float | None] = mapped_column(Float)
+    bundle_buyers: Mapped[int] = mapped_column(Integer)
+    bundle_sol: Mapped[float] = mapped_column(Float)
+    first_price_sol: Mapped[float | None] = mapped_column(Float)
+    last_price_sol: Mapped[float | None] = mapped_column(Float)
+    peak_price_sol: Mapped[float | None] = mapped_column(Float)
+    peak_sec: Mapped[float | None] = mapped_column(Float)
+    low_after_peak_sol: Mapped[float | None] = mapped_column(Float)
+    max_progress: Mapped[float] = mapped_column(Float)
+    checkpoints: Mapped[dict] = mapped_column(JSONB)  # {"10": price, "30": price, …} (null when no trade yet)
+    first_buyers: Mapped[list] = mapped_column(JSONB)  # [{w, sec, sol}] earliest distinct buyers
+    completed_at: Mapped[datetime | None] = mapped_column(TS)  # curve complete (graduation), also after the window
+    migrated_pool: Mapped[str | None] = mapped_column(ADDR)
+
+
 class RequestLog(Base):
     __tablename__ = "request_log"
     __table_args__ = (
